@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Release numbering now follows the repository `v*` tag line. Starting at `v2.34.0`, the root CLI package and this changelog stay on that shared version stream. Older entries below retain the previous `0.x` CLI numbering.
 
+## [2.36.3](https://github.com/EveryInc/compound-engineering-plugin/compare/v2.36.2...v2.36.3) (2026-03-13)
+
+
+### Bug Fixes
+
+* **targets:** nest colon-separated command names into directories ([a84682c](https://github.com/EveryInc/compound-engineering-plugin/commit/a84682cd35e94b0408f6c6a990af0732c2acf03f)), closes [#226](https://github.com/EveryInc/compound-engineering-plugin/issues/226)
+
 ## [2.36.2](https://github.com/EveryInc/compound-engineering-plugin/compare/v2.36.1...v2.36.2) (2026-03-13)
 
 
