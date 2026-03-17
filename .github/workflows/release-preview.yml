@@ -58,14 +58,15 @@ jobs:
             TITLE="$(git log -1 --pretty=%s)"
           fi
 
-          if git show-ref --verify --quiet refs/remotes/origin/main; then
-            FILES="$(git diff --name-only origin/main...HEAD | tr '\n' ' ')"
-          else
-            FILES="$(git diff --name-only HEAD~1...HEAD | tr '\n' ' ')"
-          fi
+          FILES="$(git diff --name-only HEAD~1...HEAD | tr '\n' ' ')"
 
           echo "title=$TITLE" >> "$GITHUB_OUTPUT"
           echo "files=$FILES" >> "$GITHUB_OUTPUT"
+
+      - name: Add preview note
+        run: |
+          echo "This preview currently evaluates the selected ref from its latest commit title and changed files." >> "$GITHUB_STEP_SUMMARY"
+          echo "It is side-effect free, but it does not yet reconstruct the full accumulated open release PR state." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate release metadata
         run: bun run release:validate
@@ -86,4 +87,8 @@ jobs:
           args+=(--override "coding-tutor=${{ github.event.inputs.coding_tutor_bump || 'auto' }}")
           args+=(--override "marketplace=${{ github.event.inputs.marketplace_bump || 'auto' }}")
 
-          bun run scripts/release/preview.ts "${args[@]}"
+          bun run scripts/release/preview.ts "${args[@]}" | tee /tmp/release-preview.txt
+
+      - name: Publish preview summary
+        shell: bash
+        run: cat /tmp/release-preview.txt >> "$GITHUB_STEP_SUMMARY"
