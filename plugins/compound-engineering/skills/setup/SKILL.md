@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Configure which review agents run for your project. Auto-detects stack and writes compound-engineering.local.md.
+description: Configure review agents and beta opt-in for your project. Auto-detects stack and writes compound-engineering.local.md.
 disable-model-invocation: true
 ---
 
@@ -119,6 +119,23 @@ options:
     description: "All above + git history, data integrity, agent-native checks."
 ```
 
+## Step 3.5: Beta Opt-In
+
+Ask this question for both auto-configure and customize paths:
+
+```
+question: "Would you like to enable beta skills? Beta skills are experimental versions of core workflow skills (like ce:plan) being tested before general release."
+header: "Beta"
+options:
+  - label: "No (Recommended)"
+    description: "Use stable, proven skill versions."
+  - label: "Yes — enable beta"
+    description: "Opt in to experimental skill versions. You can disable anytime by re-running /setup."
+```
+
+If "Yes — enable beta": set `beta: true` in the YAML frontmatter (Step 4).
+If "No": omit the `beta` key from the frontmatter entirely.
+
 ## Step 4: Build Agent List and Write File
 
 **Stack-specific agents:**
@@ -146,6 +163,7 @@ Write `compound-engineering.local.md`:
 ---
 review_agents: [{computed agent list}]
 plan_review_agents: [{computed plan agent list}]
+beta: true  # include this line ONLY if user opted in to beta in Step 3.5; omit entirely otherwise
 ---
 
 # Review Context
@@ -168,6 +186,7 @@ Stack:        {type}
 Review depth: {depth}
 Agents:       {count} configured
               {agent list, one per line}
+Beta skills:  {enabled|disabled}
 
 Tip: Edit the "Review Context" section to add project-specific instructions.
      Re-run this setup anytime to reconfigure.
