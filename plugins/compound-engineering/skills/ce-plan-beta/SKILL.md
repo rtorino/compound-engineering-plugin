@@ -150,7 +150,7 @@ Run these agents in parallel:
 Collect:
 - Existing patterns and conventions to follow
 - Relevant files, modules, and tests
-- CLAUDE.md or AGENTS.md guidance that materially affects the plan
+- AGENTS.md guidance that materially affects the plan, with CLAUDE.md used only as compatibility fallback when present
 - Institutional learnings from `docs/solutions/`
 
 #### 1.2 Decide on External Research
@@ -545,7 +545,7 @@ If running with ultrathink enabled, or the platform's reasoning/effort level is 
 
 ## Issue Creation
 
-When the user selects "Create Issue", detect their project tracker from `CLAUDE.md` or `AGENTS.md`:
+When the user selects "Create Issue", detect their project tracker from `AGENTS.md` or, if needed for compatibility, `CLAUDE.md`:
 
 1. Look for `project_tracker: github` or `project_tracker: linear`
 2. If GitHub:
@@ -562,7 +562,7 @@ When the user selects "Create Issue", detect their project tracker from `CLAUDE.
 
 4. If no tracker is configured:
    - Ask which tracker they use using the platform's blocking question tool when available (see Interaction Method)
-   - Suggest adding the tracker to `CLAUDE.md` or `AGENTS.md` for future runs
+   - Suggest adding the tracker to `AGENTS.md` for future runs
 
 After issue creation:
 - Display the issue URL
