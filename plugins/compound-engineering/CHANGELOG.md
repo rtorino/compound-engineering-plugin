@@ -1,5 +1,9 @@
 # Changelog
 
+This file is no longer the canonical changelog for compound-engineering releases.
+
+Historical entries are preserved below, but new release history is recorded in the root [`CHANGELOG.md`](../../CHANGELOG.md).
+
 All notable changes to the compound-engineering plugin will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),

@@ -1,11 +1,15 @@
 # Changelog
 
-All notable changes to the `@every-env/compound-plugin` CLI tool will be documented in this file.
+This is the canonical changelog for the repository.
+
+Historical entries below reflect the older repo-wide release model. After the release-please migration cutover, new entries are written here as component-scoped headings such as `compound-engineering vX.Y.Z - YYYY-MM-DD` and `cli vX.Y.Z - YYYY-MM-DD`.
+
+All notable changes to the `@every-env/compound-plugin` CLI tool and other release-owned repo components will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Release numbering now follows the repository `v*` tag line. Starting at `v2.34.0`, the root CLI package and this changelog stay on that shared version stream. Older entries below retain the previous `0.x` CLI numbering.
+Historical release numbering below follows the older repository `v*` tag line. Older entries remain intact for continuity.
 
 # [2.42.0](https://github.com/EveryInc/compound-engineering-plugin/compare/v2.41.1...v2.42.0) (2026-03-17)
 

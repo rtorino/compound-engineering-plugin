@@ -329,7 +329,7 @@ The dry-run summary should include:
 
 ## Implementation Units
 
-- [ ] **Unit 1: Define the new release component model and config scaffolding**
+- [x] **Unit 1: Define the new release component model and config scaffolding**
 
 **Goal:** Replace the single-line semantic-release configuration with release-please-oriented repo configuration that expresses the four release components and their version surfaces.
 
@@ -370,7 +370,7 @@ The dry-run summary should include:
 - Package scripts exist for preview/sync/validate entrypoints.
 - Release intent rules are documented without forcing repetitive component scoping on routine CE work.
 
-- [ ] **Unit 2: Build repo-owned release scripts for metadata sync, counts, and preview**
+- [x] **Unit 2: Build repo-owned release scripts for metadata sync, counts, and preview**
 
 **Goal:** Replace `release-docs` and ad-hoc release bookkeeping with explicit scripts that compute release-owned metadata updates and produce dry-run summaries.
 
@@ -409,7 +409,7 @@ The dry-run summary should include:
 - Dry run can run in CI without side effects.
 - Metadata/count drift can be detected deterministically before release.
 
-- [ ] **Unit 3: Wire release PR maintenance and manual release execution in CI**
+- [x] **Unit 3: Wire release PR maintenance and manual release execution in CI**
 
 **Goal:** Establish one standing release PR for the repo that updates automatically as new releasable work lands, while keeping the actual release action manual.
 
@@ -456,7 +456,7 @@ The dry-run summary should include:
 - The same proposed release state is visible consistently across release PR maintenance, dry run, and post-merge release execution.
 - Exceptional release overrides are possible without synthetic commits on `main`.
 
-- [ ] **Unit 4: Centralize changelog ownership and retire plugin-local canonical release history**
+- [x] **Unit 4: Centralize changelog ownership and retire plugin-local canonical release history**
 
 **Goal:** Make the root changelog the only canonical changelog while preserving history and preventing future fragmentation.
 
@@ -491,7 +491,7 @@ The dry-run summary should include:
 - A maintainer reading the repo can identify one canonical changelog without ambiguity.
 - No history is lost or silently rewritten.
 
-- [ ] **Unit 5: Remove legacy release guidance and replace it with the new authority model**
+- [x] **Unit 5: Remove legacy release guidance and replace it with the new authority model**
 
 **Goal:** Update repo instructions and docs so contributors follow the new release system rather than obsolete semantic-release or `release-docs` guidance.
 
@@ -524,7 +524,7 @@ The dry-run summary should include:
 - A new maintainer can understand the release process from docs alone without hidden local workflows.
 - Docs no longer encode obsolete repo structure or stale release surfaces.
 
-- [ ] **Unit 6: Add automated coverage for component detection, metadata sync, and release preview**
+- [x] **Unit 6: Add automated coverage for component detection, metadata sync, and release preview**
 
 **Goal:** Protect the new release model against regression by testing the component rules, metadata updates, and preview behavior.
 
@@ -592,6 +592,7 @@ The dry-run summary should include:
 - Document one canonical changelog: root `CHANGELOG.md`.
 - Document one rule for contributors: ordinary feature PRs do not hand-bump release-owned versions or changelog entries.
 - Add a short migration note anywhere old release instructions are likely to be rediscovered, especially around `plugins/compound-engineering/CHANGELOG.md` and the removed `release-docs` command.
+- After merge, run one live GitHub Actions validation pass to confirm `release-please` tag/output wiring and conditional CLI publish behavior end to end.
 
 ## Sources & References
 

@@ -244,7 +244,7 @@ Set `CONTEXT7_API_KEY` in your environment to authenticate. Or add it globally i
 
 ## Version History
 
-See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+See the repo root [CHANGELOG.md](../../CHANGELOG.md) for canonical release history.
 
 ## License
 

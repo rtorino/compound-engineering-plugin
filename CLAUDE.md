@@ -105,7 +105,7 @@ Contributors should not guess the next released plugin version in a normal PR:
 #### 4. Update documentation
 
 - [ ] `plugins/compound-engineering/README.md` → list all components
-- [ ] Do not cut a release section in `plugins/compound-engineering/CHANGELOG.md` for a normal feature PR
+- [ ] Do not cut a release section in the root `CHANGELOG.md` for a normal feature PR
 - [ ] `CLAUDE.md` → update structure diagram if needed
 
 #### 5. Validate release-owned metadata
@@ -222,19 +222,17 @@ docs/
 
 ### Keeping Docs Up-to-Date
 
-**IMPORTANT:** After ANY change to agents, commands, skills, or MCP servers, run:
+Release-owned metadata should be validated with the repo scripts:
 
 ```bash
-claude /release-docs
+bun run release:validate
 ```
 
-This command:
-1. Counts all current components
-2. Reads all agent/command/skill/MCP files
-3. Regenerates all reference pages
-4. Updates stats on the landing page
-5. Updates the changelog from CHANGELOG.md
-6. Validates counts match across all files
+If release-owned descriptions or counts need to be synchronized intentionally, use:
+
+```bash
+bun run release:sync-metadata
+```
 
 ### Manual Updates
 
@@ -300,15 +298,15 @@ cat plugins/compound-engineering/.claude-plugin/plugin.json | jq .
 ### Adding a New Agent
 
 1. Create `plugins/compound-engineering/agents/new-agent.md`
-2. Update plugin.json agent count and agent list
-3. Update README.md agent list
+2. Update README.md agent list
+3. Validate release-owned metadata with `bun run release:validate`
 4. Test with `claude agent new-agent "test"`
 
 ### Adding a New Command
 
 1. Create `plugins/compound-engineering/commands/new-command.md`
-2. Update plugin.json command count and command list
-3. Update README.md command list
+2. Update README.md command list
+3. Validate release-owned metadata with `bun run release:validate`
 4. Test with `claude /new-command`
 
 ### Adding a New Skill
@@ -321,9 +319,9 @@ cat plugins/compound-engineering/.claude-plugin/plugin.json | jq .
    └── scripts/           # Supporting scripts (optional)
    ```
 3. Update plugin.json description with new skill count
-4. Update marketplace.json description with new skill count
-5. Update README.md with skill documentation
-6. Update CHANGELOG.md with the addition
+4. Update README.md with skill documentation
+5. Validate release-owned metadata with `bun run release:validate`
+6. Do not hand-add a release entry; release automation owns canonical changelog entries
 7. Test with `claude skill skill-name`
 
 **Skill file format (SKILL.md):**
@@ -349,11 +347,12 @@ Tags should reflect the compounding engineering philosophy:
 
 Follow these patterns for commit messages:
 
-- `Add [agent/command name]` - Adding new functionality
-- `Remove [agent/command name]` - Removing functionality
-- `Update [file] to [what changed]` - Updating existing files
-- `Fix [issue]` - Bug fixes
-- `Simplify [component] to [improvement]` - Refactoring
+- `feat: add [agent/command name]` - Adding new functionality
+- `fix: correct [issue]` - Bug fixes
+- `docs: update [file]` - Documentation updates
+- `refactor: simplify [component]` - Refactoring
+
+Component scope is optional, for example `feat(coding-tutor): add quiz reset`.
 
 Include the attribution footer (fill in your actual values):
 
