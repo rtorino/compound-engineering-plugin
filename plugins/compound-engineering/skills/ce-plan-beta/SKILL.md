@@ -177,15 +177,27 @@ Based on the origin document, user signals, and local findings, decide whether e
 - **Topic risk** — Security, payments, external APIs warrant more caution regardless of user signals.
 - **Uncertainty level** — Is the approach clear or still open-ended?
 
+**Leverage repo-research-analyst's technology context:**
+
+The repo-research-analyst output includes a structured Technology & Infrastructure summary. Use it to make sharper external research decisions:
+
+- If specific frameworks and versions were detected (e.g., Rails 7.2, Next.js 14, Go 1.22), pass those exact identifiers to framework-docs-researcher so it fetches version-specific documentation
+- If the feature touches a technology layer the scan found well-established in the repo (e.g., existing Sidekiq jobs when planning a new background job), lean toward skipping external research -- local patterns are likely sufficient
+- If the feature touches a technology layer the scan found absent or thin (e.g., no existing proto files when planning a new gRPC service), lean toward external research -- there are no local patterns to follow
+- If the scan detected deployment infrastructure (Docker, K8s, serverless), note it in the planning context passed to downstream agents so they can account for deployment constraints
+- If the scan detected a monorepo and scoped to a specific service, pass that service's tech context to downstream research agents -- not the aggregate of all services. If the scan surfaced the workspace map without scoping, use the feature description to identify the relevant service before proceeding with research
+
 **Always lean toward external research when:**
 - The topic is high-risk: security, payments, privacy, external APIs, migrations, compliance
 - The codebase lacks relevant local patterns
 - The user is exploring unfamiliar territory
+- The technology scan found the relevant layer absent or thin in the codebase
 
 **Skip external research when:**
 - The codebase already shows a strong local pattern
 - The user already knows the intended shape
 - Additional external context would add little practical value
+- The technology scan found the relevant layer well-established with existing examples to follow
 
 Announce the decision briefly before continuing. Examples:
 - "Your codebase has solid patterns for this. Proceeding without external research."
