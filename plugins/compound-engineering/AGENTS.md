@@ -84,6 +84,18 @@ When adding or modifying skills, verify compliance with the skill spec:
 - [ ] When a skill needs to ask the user a question, instruct use of the platform's blocking question tool and name the known equivalents (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini)
 - [ ] Include a fallback for environments without a question tool (e.g., present numbered options and wait for the user's reply before proceeding)
 
+### Cross-Platform Task Tracking
+
+- [ ] When a skill needs to create or track tasks, describe the intent (e.g., "create a task list") and name the known equivalents (`TaskCreate`/`TaskUpdate`/`TaskList` in Claude Code, `update_plan` in Codex)
+- [ ] Do not reference `TodoWrite` or `TodoRead` — these are legacy Claude Code tools replaced by `TaskCreate`/`TaskUpdate`/`TaskList`
+- [ ] When a skill dispatches sub-agents, prefer parallel execution but include a sequential fallback for platforms that do not support parallel dispatch
+
+### Script Path References in Skills
+
+- [ ] In bash code blocks, reference co-located scripts using relative paths (e.g., `bash scripts/my-script ARG`) — not `${CLAUDE_PLUGIN_ROOT}` or other platform-specific variables
+- [ ] All platforms resolve script paths relative to the skill's directory; no env var prefix is needed
+- [ ] Always also include a markdown link to the script (e.g., `[scripts/my-script](scripts/my-script)`) so the agent can locate and read it
+
 ### Cross-Platform Reference Rules
 
 This plugin is authored once, then converted for other agent platforms. Commands and agents are transformed during that conversion, but `plugin.skills` are usually copied almost exactly as written.
