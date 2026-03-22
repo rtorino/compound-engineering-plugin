@@ -94,16 +94,15 @@ Core workflow commands use `ce:` prefix to unambiguously identify them as compou
 | `/changelog` | Create engaging changelogs for recent merges |
 | `/create-agent-skill` | Create or edit Claude Code skills |
 | `/generate_command` | Generate new slash commands |
-| `/heal-skill` | Fix skill documentation issues |
 | `/sync` | Sync Claude Code config across machines |
-| `/report-bug` | Report a bug in the plugin |
+| `/report-bug-ce` | Report a bug in the compound-engineering plugin |
 | `/reproduce-bug` | Reproduce bugs using logs and console |
 | `/resolve_parallel` | Resolve TODO comments in parallel |
 | `/resolve_pr_parallel` | Resolve PR comments in parallel |
 | `/resolve-todo-parallel` | Resolve todos in parallel |
 | `/triage` | Triage and prioritize issues |
 | `/test-browser` | Run browser tests on PR-affected pages |
-| `/xcode-test` | Build and test iOS apps on simulator |
+| `/test-xcode` | Build and test iOS apps on simulator |
 | `/feature-video` | Record video walkthroughs and add to PR description |
 
 ## Skills
