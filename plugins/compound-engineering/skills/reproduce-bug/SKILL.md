@@ -1,6 +1,6 @@
 ---
 name: reproduce-bug
-description: Systematically reproduce and investigate a bug from a GitHub issue using a hypothesis-driven workflow. Use when the user mentions a bug report, GitHub issue, wants to reproduce an error, investigate a defect, or debug a reported problem -- even if they don't say "reproduce".
+description: Systematically reproduce and investigate a bug from a GitHub issue. Use when the user provides a GitHub issue number or URL for a bug they want reproduced or investigated.
 argument-hint: "[GitHub issue number or URL]"
 ---
 
@@ -13,6 +13,8 @@ A framework-agnostic, hypothesis-driven workflow for reproducing and investigati
 Fetch and analyze the bug report to extract structured information before touching the codebase.
 
 ### Fetch the issue
+
+If no issue number or URL was provided as an argument, ask the user for one before proceeding (using the platform's question tool -- e.g., `AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini -- or present a prompt and wait for a reply).
 
 ```bash
 gh issue view $ARGUMENTS --json title,body,comments,labels,assignees
