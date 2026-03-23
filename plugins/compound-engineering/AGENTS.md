@@ -59,6 +59,12 @@ skills/
 
 **Why `ce:`?** Claude Code has built-in `/plan` and `/review` commands. The `ce:` namespace (short for compound-engineering) makes it immediately clear these commands belong to this plugin.
 
+## Pipeline Mode Convention
+
+Skills with interactive handoff menus or post-generation options must support **pipeline mode** when invoked from LFG, SLFG, or any `disable-model-invocation` context. The core rule: **skip workflow prompts, keep content prompts.** Handoff menus, post-generation options, and routing questions get skipped -- the pipeline controls flow. Content questions that clarify what to build still get asked -- the user is present and bad requirements waste the whole pipeline. Skills must write durable outputs (plans, requirements docs) and return control without chaining into the next step.
+
+Skills with pipeline mode: `ce:brainstorm`, `ce:plan`. Document behavioral changes in a `## Pipeline Mode` section within the skill's SKILL.md.
+
 ## Skill Compliance Checklist
 
 When adding or modifying skills, verify compliance with the skill spec:

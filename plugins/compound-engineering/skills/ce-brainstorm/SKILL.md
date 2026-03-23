@@ -34,6 +34,20 @@ This skill does not implement code. It explores, clarifies, and documents decisi
 
 - **Keep outputs concise** - Prefer short sections, brief bullets, and only enough detail to support the next decision.
 
+## Pipeline Mode
+
+When invoked from an automated workflow (LFG, SLFG, or any `disable-model-invocation` context), distinguish between two kinds of prompts:
+
+- **Workflow prompts** (handoff menus, "what do you want to do next?", "resume or start fresh?", post-generation options) → skip. These control routing, and the pipeline handles routing.
+- **Content prompts** (clarifying what to build, resolving ambiguity, scoping questions) → still ask. Getting requirements wrong wastes every downstream step.
+
+Specific phase behavior:
+
+- **Phase 0.1:** If a relevant requirements document already exists, note it and return control immediately. The next pipeline step (`ce:plan`) will discover and use it. Do not ask whether to resume or start fresh.
+- **Phase 0.2 short-circuit is a genuine skip.** If requirements are already clear (specific acceptance criteria, exact expected behavior, well-defined scope), skip brainstorm entirely. Note "requirements clear, skipping brainstorm" and return control to the calling workflow. Do not proceed to Phase 1.3 or Phase 3.
+- **Phases 1.3 and 2:** Content questions to clarify vague or ambiguous requirements are still permitted. The user is present and getting requirements right is more valuable than speed.
+- **Phase 4 handoff is skipped.** Do not present handoff options or invoke `/ce:plan`. Write the requirements document (if warranted) and return control to the calling workflow.
+
 ## Feature Description
 
 <feature_description> #$ARGUMENTS </feature_description>
@@ -50,7 +64,8 @@ Do not proceed until you have a feature description from the user.
 
 If the user references an existing brainstorm topic or document, or there is an obvious recent matching `*-requirements.md` file in `docs/brainstorms/`:
 - Read the document
-- Confirm with the user before resuming: "Found an existing requirements doc for [topic]. Should I continue from this, or start fresh?"
+- **In pipeline mode:** note the existing document and return control immediately (see Pipeline Mode above). Do not ask the user whether to resume.
+- **Otherwise:** Confirm with the user before resuming: "Found an existing requirements doc for [topic]. Should I continue from this, or start fresh?"
 - If resuming, summarize the current state briefly, continue from its existing decisions and outstanding questions, and update the existing document instead of creating a duplicate
 
 #### 0.2 Assess Whether Brainstorming Is Needed
@@ -62,7 +77,8 @@ If the user references an existing brainstorm topic or document, or there is an 
 - Constrained, well-defined scope
 
 **If requirements are already clear:**
-Keep the interaction brief. Confirm understanding and present concise next-step options rather than forcing a long brainstorm. Only write a short requirements document when a durable handoff to planning or later review would be valuable. Skip Phase 1.1 and 1.2 entirely — go straight to Phase 1.3 or Phase 3.
+- **In pipeline mode:** skip brainstorm entirely and return control to the calling workflow (see Pipeline Mode above). Do not proceed to Phase 1.3 or Phase 3.
+- **Otherwise:** Keep the interaction brief. Confirm understanding and present concise next-step options rather than forcing a long brainstorm. Only write a short requirements document when a durable handoff to planning or later review would be valuable. Skip Phase 1.1 and 1.2 entirely — go straight to Phase 1.3 or Phase 3.
 
 #### 0.3 Assess Scope
 
@@ -247,7 +263,9 @@ If a document contains outstanding questions:
 
 #### 4.1 Present Next-Step Options
 
-Present next steps using the platform's blocking question tool when available (see Interaction Rules). Otherwise present numbered options in chat and end the turn.
+**In pipeline mode:** skip Phase 4 entirely. Write the requirements document (if warranted by the brainstorm) and return control to the calling workflow. Do not present handoff options or invoke `/ce:plan`.
+
+**Otherwise:** Present next steps using the platform's blocking question tool when available (see Interaction Rules). Otherwise present numbered options in chat and end the turn.
 
 If `Resolve Before Planning` contains any items:
 - Ask the blocking questions now, one at a time, by default

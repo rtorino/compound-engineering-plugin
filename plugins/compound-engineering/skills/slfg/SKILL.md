@@ -1,35 +1,41 @@
 ---
 name: slfg
-description: Full autonomous engineering workflow using swarm mode for parallel execution
+description: Run the complete engineering pipeline from idea to PR with parallel execution via swarm agents. Same pipeline as lfg but parallelizes work and review phases for speed.
 argument-hint: "[feature description]"
 disable-model-invocation: true
 ---
 
-Swarm-enabled LFG. Run these steps in order, parallelizing where indicated. Do not stop between steps — complete every step through to the end.
+Swarm-enabled LFG. Run these steps in order, parallelizing where indicated. Skills run in pipeline mode: skip workflow prompts (handoff menus, "what next?" options) but still ask content questions when requirements or scope are unclear.
+
+## Brainstorm Phase
+
+1. `/ce:brainstorm $ARGUMENTS`
+   - Brainstorm runs in pipeline mode: it assesses whether requirements exploration is needed and either skips (if requirements are already clear) or runs brainstorm with content questions as needed and writes a requirements document. It will not present handoff options or invoke `/ce:plan` -- control returns here.
+
+2. **Optional:** If the `ralph-loop` skill is available, run `/ralph-loop:ralph-loop "finish all slash commands" --completion-promise "DONE"` to iterate autonomously through the remaining steps. Brainstorm ran first because it may need user interaction; everything from here on is autonomous and benefits from ralph's fresh-context iteration. If not available or it fails, continue to step 3.
 
 ## Sequential Phase
 
-1. **Optional:** If the `ralph-loop` skill is available, run `/ralph-loop:ralph-loop "finish all slash commands" --completion-promise "DONE"`. If not available or it fails, skip and continue to step 2 immediately.
-2. `/ce:plan $ARGUMENTS`
-3. **Conditionally** run `/compound-engineering:deepen-plan`
-   - Run the `deepen-plan` workflow only if the plan is `Standard` or `Deep`, touches a high-risk area (auth, security, payments, migrations, external APIs, significant rollout concerns), or still has obvious confidence gaps in decisions, sequencing, system-wide impact, risks, or verification
-   - If you run the `deepen-plan` workflow, confirm the plan was deepened or explicitly judged sufficiently grounded before moving on
-   - If you skip it, note why and continue to step 4
-4. `/ce:work` — **Use swarm mode**: Make a Task list and launch an army of agent swarm subagents to build the plan
+3. `/ce:plan $ARGUMENTS`
+4. **Conditionally** run `/compound-engineering:deepen-plan`
+   - Run only if the plan is `Standard` or `Deep`, touches a high-risk area (auth, security, payments, migrations, external APIs, significant rollout concerns), or still has obvious confidence gaps in decisions, sequencing, system-wide impact, risks, or verification
+   - If deepen-plan ran, confirm the plan was deepened or judged sufficiently grounded before moving on
+   - If skipped, note why and continue
+5. `/ce:work` -- **Use swarm mode**: Make a Task list and launch an army of agent swarm subagents to build the plan
 
 ## Parallel Phase
 
-After work completes, launch steps 5 and 6 as **parallel swarm agents** (both only need code to be written):
+After work completes, launch steps 6 and 7 as **parallel swarm agents** (both only need code to be written):
 
-5. `/ce:review` — spawn as background Task agent
-6. `/compound-engineering:test-browser` — spawn as background Task agent
+6. `/ce:review` -- catch issues before they ship
+7. `/compound-engineering:test-browser` -- verify the feature works in a real browser
 
 Wait for both to complete before continuing.
 
 ## Finalize Phase
 
-7. `/compound-engineering:resolve-todo-parallel` — resolve findings, compound on learnings, clean up completed todos
-8. `/compound-engineering:feature-video` — record the final walkthrough and add to PR
-9. Output `<promise>DONE</promise>` when video is in PR
+8. `/compound-engineering:resolve-todo-parallel` -- resolve findings from review and testing, compound on learnings, clean up completed todos
+9. **Conditionally** run `/compound-engineering:feature-video` -- record a walkthrough and add to the PR. Skip if the project has no browser-based UI (e.g., CLI tools, plugins, libraries, APIs).
+10. Output `<promise>DONE</promise>` when video is in PR
 
 Start with step 1 now.

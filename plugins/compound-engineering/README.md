@@ -89,9 +89,20 @@ Agents are organized into categories for easier discovery.
 
 ## Commands
 
-### Workflow Commands
+### All-in-One Workflow
 
-Core workflow commands use `ce:` prefix to unambiguously identify them as compound-engineering commands:
+Run a complete engineering workflow from feature description to PR:
+
+| Command | Description |
+|---------|-------------|
+| `/lfg [description]` | Full autonomous workflow: brainstorm, plan, implement, review, and record |
+| `/slfg [description]` | Same workflow with parallel execution via swarm mode |
+
+Both run the full pipeline: `brainstorm (if needed) → plan → work → review → resolve todos → test → video`. `/slfg` parallelizes where possible using swarm agents. Brainstorm automatically skips when requirements are already clear.
+
+### Step-by-Step Workflow
+
+Use individual commands when you want control over specific phases. Core workflow commands use the `ce:` prefix:
 
 | Command | Description |
 |---------|-------------|
@@ -103,12 +114,12 @@ Core workflow commands use `ce:` prefix to unambiguously identify them as compou
 | `/ce:compound` | Document solved problems to compound team knowledge |
 | `/ce:compound-refresh` | Refresh stale or drifting learnings and decide whether to keep, update, replace, or archive them |
 
+Step-by-step is useful when you want to brainstorm now and plan later, build a plan from an existing requirements doc, run just a review, or document a fix.
+
 ### Utility Commands
 
 | Command | Description |
 |---------|-------------|
-| `/lfg` | Full autonomous engineering workflow |
-| `/slfg` | Full autonomous workflow with swarm mode for parallel execution |
 | `/deepen-plan` | Stress-test plans and deepen weak sections with targeted research |
 | `/changelog` | Create engaging changelogs for recent merges |
 | `/generate_command` | Generate new slash commands |

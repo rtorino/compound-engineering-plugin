@@ -182,22 +182,43 @@ Notes:
 
 ## Workflow
 
+### All-in-one
+
+Run a complete engineering workflow from feature description to PR:
+
+| Command | Description |
+|---------|-------------|
+| `/lfg [description]` | Full autonomous workflow: brainstorm, plan, implement, review, and record |
+| `/slfg [description]` | Same workflow with parallel execution via swarm mode |
+
 ```
-Brainstorm → Plan → Work → Review → Compound → Repeat
-    ↑
-  Ideate (optional — when you need ideas)
+/lfg add dark mode support to the settings page
+```
+
+Both run the full pipeline: brainstorm (if needed) → plan → work → review → resolve todos → test → video. `/slfg` parallelizes where possible using swarm agents.
+
+### Step-by-step
+
+Use individual commands when you want control over specific phases:
+
+```
+Ideate → Brainstorm → Plan → Work → Review → Compound
 ```
 
 | Command | Purpose |
 |---------|---------|
-| `/ce:ideate` | Discover high-impact project improvements through divergent ideation and adversarial filtering |
+| `/ce:ideate` | Surface high-impact improvement ideas |
 | `/ce:brainstorm` | Explore requirements and approaches before planning |
 | `/ce:plan` | Turn feature ideas into detailed implementation plans |
 | `/ce:work` | Execute plans with worktrees and task tracking |
 | `/ce:review` | Multi-agent code review before merging |
 | `/ce:compound` | Document learnings to make future work easier |
 
-The `/ce:ideate` skill proactively surfaces strong improvement ideas, and `/ce:brainstorm` then clarifies the selected one before committing to a plan.
+Step-by-step is useful when you want to:
+- Brainstorm now and plan later
+- Create a plan from an existing requirements doc or ticket
+- Run just a code review on changes you've already made
+- Document a solved problem without the full workflow
 
 Each cycle compounds: brainstorms sharpen plans, plans inform future plans, reviews catch more issues, patterns get documented.
 
