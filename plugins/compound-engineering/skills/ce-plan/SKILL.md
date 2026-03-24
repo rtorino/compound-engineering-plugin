@@ -563,7 +563,7 @@ When invoked from an automated workflow (LFG, SLFG, or any `disable-model-invoca
 
 Specific behavior:
 
-- **Multiple source documents:** use the most recent matching document automatically instead of asking.
+- **Multiple source documents:** prefer the document whose topic and problem frame most closely match the current feature description, not just the most recent. If genuine ambiguity remains, ask the user -- this is a content clarification, not routing.
 - **Idea refinement (no source doc):** still permitted -- these are content questions that improve plan quality.
 - **Detail level selection and research decisions:** make automatically based on scope and risk signals.
 - **Post-Generation Options are skipped.** Do not present the options menu or invoke `/ce:work`. Write the plan file, confirm it was written, and return control to the calling workflow.
