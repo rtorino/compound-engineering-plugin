@@ -24,6 +24,18 @@ Platform-specific hints:
 - `agent-browser` CLI installed (see Setup below)
 - Git repository with changes to test
 
+## Pipeline Mode
+
+When invoked from LFG, SLFG, or another caller-controlled automated workflow, prefer progress over interaction and use safe defaults.
+
+Specific behavior:
+
+- Default to headless mode. Do not ask whether to watch the browser.
+- If `agent-browser` cannot be installed or the dev server is not running, note the skip briefly and return control to the caller.
+- If a flow requires human verification (OAuth, email, payments, SMS, external service confirmation), mark it as manual verification required, note it briefly, and continue testing other routes.
+- If a page test fails, capture the failure, create a todo or finding for follow-up, note it briefly, and continue testing the remaining routes.
+- Briefly inform the user when a material verification step was skipped or degraded. Do not block on the prompt.
+
 ## Setup
 
 ```bash
@@ -48,11 +60,16 @@ Before starting, verify `agent-browser` is available:
 command -v agent-browser >/dev/null 2>&1 && echo "Ready" || (echo "Installing..." && npm install -g agent-browser && agent-browser install)
 ```
 
-If installation fails, inform the user and stop.
+If installation fails:
 
-### 2. Ask Browser Mode
+- In pipeline mode, note the skip briefly and return control to the caller.
+- Otherwise, inform the user and stop.
 
-Ask the user whether to run headed or headless (using the platform's question tool — e.g., `AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini — or present options and wait for a reply):
+### 2. Choose Browser Mode
+
+In pipeline mode, default to headless and note that choice briefly.
+
+Otherwise, ask the user whether to run headed or headless (using the platform's question tool — e.g., `AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini — or present options and wait for a reply):
 
 ```
 Do you want to watch the browser tests run?
@@ -133,7 +150,10 @@ agent-browser open http://localhost:${PORT}
 agent-browser snapshot -i
 ```
 
-If the server is not running, inform the user:
+If the server is not running:
+
+- In pipeline mode, note the skip briefly and return control to the caller.
+- Otherwise, inform the user:
 
 ```
 Server not running on port ${PORT}
@@ -193,7 +213,9 @@ Pause for human input when testing touches flows that require external interacti
 | SMS | "Verify you received the SMS code" |
 | External APIs | "Confirm the [service] integration is working" |
 
-Ask the user (using the platform's question tool, or present numbered options and wait):
+In pipeline mode, mark the route as requiring manual verification, note it briefly, and continue.
+
+Otherwise, ask the user (using the platform's question tool, or present numbered options and wait):
 
 ```
 Human Verification Needed
@@ -215,7 +237,10 @@ When a test fails:
    - Screenshot the error state: `agent-browser screenshot error.png`
    - Note the exact reproduction steps
 
-2. **Ask the user how to proceed:**
+2. **Decide how to proceed:**
+
+   - In pipeline mode, create a todo or equivalent finding for the failure, note it briefly, and continue testing the remaining routes.
+   - Otherwise, ask the user how to proceed:
 
    ```
    Test Failed: [route]

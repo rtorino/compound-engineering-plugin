@@ -12,6 +12,20 @@ Execute a work plan efficiently while maintaining quality and finishing features
 
 This command takes a work document (plan, specification, or todo file) and executes it systematically. The focus is on **shipping complete features** by understanding requirements quickly, following existing patterns, and maintaining quality throughout.
 
+## Pipeline Mode
+
+When invoked from LFG, SLFG, or another caller-controlled automated workflow, use the same safe defaults described below and avoid workflow prompts.
+
+Specific behavior:
+
+- Do not ask for generic approval to proceed.
+- Respect explicit user instructions about branch strategy, such as "use `main`", "create a new branch", or "use a worktree".
+- If already on a non-default branch, continue there and note it briefly.
+- If on the default branch and the user did not explicitly authorize staying there, create a feature branch automatically. Prefer a worktree only when the user explicitly asked for it or the environment clearly calls for it.
+- Never commit directly to the default branch without explicit user permission.
+- Stop only for true blockers: contradictory requirements, missing credentials, broken environment/setup, or another consent boundary that cannot be inferred safely.
+- When using a fallback or skipping a non-critical step, inform the user briefly and continue.
+
 ## Input Document
 
 <input_document> #$ARGUMENTS </input_document>
@@ -31,8 +45,8 @@ This command takes a work document (plan, specification, or todo file) and execu
    - Review any references or links provided in the plan
    - If the user explicitly asks for TDD, test-first, or characterization-first execution in this session, honor that request even if the plan has no `Execution note`
    - If anything is unclear or ambiguous, ask clarifying questions now
-   - Get user approval to proceed
-   - **Do not skip this** - better to ask questions now than build the wrong thing
+   - Do not ask for generic approval to proceed once the plan is clear enough to execute
+   - Ask only when a real ambiguity or blocker would materially change the work
 
 2. **Setup Environment**
 
@@ -48,35 +62,22 @@ This command takes a work document (plan, specification, or todo file) and execu
    fi
    ```
 
-   **If already on a feature branch** (not the default branch):
-   - Ask: "Continue working on `[current_branch]`, or create a new branch?"
-   - If continuing, proceed to step 3
-   - If creating new, follow Option A or B below
+   Choose the branch strategy automatically using this precedence:
 
-   **If on the default branch**, choose how to proceed:
+   - **Explicit user instruction wins** — if the user asked to use `main`, create a new branch, or use a worktree, do that.
+   - **Already on a feature branch** — continue on `current_branch` and note that choice briefly.
+   - **On the default branch without explicit permission to stay there** — create a feature branch automatically.
+   - **Use a worktree** only when the user explicitly asked for it or the environment clearly calls for isolated parallel development.
+   - **Continue on the default branch** only when the user explicitly authorized it.
 
-   **Option A: Create a new branch**
+   Never commit directly to the default branch without explicit permission.
+
+   When creating a branch automatically:
    ```bash
    git pull origin [default_branch]
    git checkout -b feature-branch-name
    ```
    Use a meaningful name based on the work (e.g., `feat/user-authentication`, `fix/email-validation`).
-
-   **Option B: Use a worktree (recommended for parallel development)**
-   ```bash
-   skill: git-worktree
-   # The skill will create a new branch from the default branch in an isolated worktree
-   ```
-
-   **Option C: Continue on the default branch**
-   - Requires explicit user confirmation
-   - Only proceed after user explicitly says "yes, commit to [default_branch]"
-   - Never commit directly to the default branch without explicit permission
-
-   **Recommendation**: Use worktree if:
-   - You want to work on multiple features simultaneously
-   - You want to keep the default branch clean while experimenting
-   - You plan to switch between branches frequently
 
 3. **Create Todo List**
    - Use your available task tracking tool (e.g., TodoWrite, task lists) to break the plan into actionable tasks
