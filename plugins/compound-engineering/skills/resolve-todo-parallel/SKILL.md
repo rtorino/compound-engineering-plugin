@@ -12,6 +12,8 @@ Resolve all TODO comments using parallel processing, document lessons learned, t
 
 Get all unresolved TODOs from the /todos/*.md directory
 
+Residual actionable work may come from `ce:review-beta mode:autonomous` after its in-skill `safe_auto` pass. Treat those todos as normal unresolved work items; the review skill has already decided they should not be auto-fixed inline.
+
 If any todo recommends deleting, removing, or gitignoring files in `docs/brainstorms/`, `docs/plans/`, or `docs/solutions/`, skip it and mark it as `wont_fix`. These are compound-engineering pipeline artifacts that are intentional and permanent.
 
 ### 2. Plan
