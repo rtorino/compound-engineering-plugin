@@ -9,7 +9,7 @@ Assess the task, choose the right execution path, and get it done. Not every tas
 
 ## Autopilot Run Contract
 
-For the full pipeline, `lfg` owns the deterministic autopilot contract.
+For resumable `lfg` runs across direct, lightweight, and full-pipeline routes, `lfg` owns the deterministic autopilot contract.
 
 - Downstream marker format:
   - `[ce-autopilot manifest=.context/compound-engineering/autopilot/<run-id>/session.json] :: <normal input>`
@@ -20,6 +20,7 @@ For the full pipeline, `lfg` owns the deterministic autopilot contract.
   - `decisions.md`
 - Phase-1 manifest schema:
   - `run_id`
+  - `route` = `direct | lightweight | full`
   - `mode` = `autopilot`
   - `status` = `active | completed | aborted`
   - `implementation_mode` = `standard | swarm`
@@ -28,12 +29,14 @@ For the full pipeline, `lfg` owns the deterministic autopilot contract.
   - `feature_description`
   - `current_gate`
   - `gates.requirements | gates.plan | gates.implementation | gates.review | gates.verification | gates.wrap_up`
-  - `artifacts.requirements_doc | artifacts.plan_doc | artifacts.decision_log | artifacts.pr_url`
+  - `artifacts.requirements_doc | artifacts.plan_doc | artifacts.decision_log`
 - Each gate entry contains:
-  - `state` = `complete | pending | blocked | unknown`
+  - `state` = `complete | skipped | pending | blocked | unknown`
   - `evidence`
 
 `lfg` is the only top-level skill that creates or backfills these manifests. Downstream skills must use the explicit marker plus manifest path rather than guessing from caller prose.
+
+Direct and lightweight routes still create a lightweight manifest immediately. In those routes, `artifacts.requirements_doc` and `artifacts.plan_doc` may remain unset by design, and `gates.requirements` / `gates.plan` should be marked `skipped` with routing evidence instead of being treated as missing work.
 
 Implementation-mode selection rule:
 - explicit user request for swarm or agent teams wins
@@ -63,10 +66,22 @@ The fix is obvious and self-contained. No planning or multi-agent review needed.
 
 Before changing files, preserve the same branch/worktree safety as `ce:work` Phase 1: choose the right branch first, and never commit directly to the default branch without explicit user permission.
 
+Before changing files, create or backfill a lightweight manifest for this run:
+- `route = direct`
+- `current_gate = implementation`
+- `gates.requirements.state = skipped`
+- `gates.plan.state = skipped`
+- `gates.review`, `gates.verification`, and `gates.wrap_up` start as `pending`
+- `artifacts.requirements_doc` and `artifacts.plan_doc` may remain unset by design
+
+If the task stops looking direct while you work, upgrade the manifest to `route = full`, mark any missing early gates `pending`, and run them before continuing.
+
 Make the change, verify it works (typecheck, lint, or test if applicable), then preserve the same applicable wrap-up contract as `ce:work` Phase 4 before outputting `<promise>DONE</promise>`:
 - commit it, push it, and create or update the PR
 - add a `## Post-Deploy Monitoring & Validation` section to the PR description
 - if the change affects browser UI, capture and upload screenshots and include the image URLs in the PR description
+
+Update the manifest after implementation, self-review, verification, and wrap-up so rerunning `/lfg` resumes at the first unmet late-stage gate instead of routing from scratch.
 
 ---
 
@@ -76,10 +91,22 @@ The task is clear and bounded -- requirements and expected behavior are already 
 
 Before changing files, preserve the same branch/worktree safety as `ce:work` Phase 1: choose the right branch first, and never commit directly to the default branch without explicit user permission.
 
+Before changing files, create or backfill a lightweight manifest for this run:
+- `route = lightweight`
+- `current_gate = implementation`
+- `gates.requirements.state = skipped`
+- `gates.plan.state = skipped`
+- `gates.review`, `gates.verification`, and `gates.wrap_up` start as `pending`
+- `artifacts.requirements_doc` and `artifacts.plan_doc` may remain unset by design
+
+If the task stops looking lightweight while you work, upgrade the manifest to `route = full`, mark any missing early gates `pending`, and run them before continuing.
+
 Do the work directly. Verify it works (typecheck, lint, or test if applicable), give it a quick self-review for obvious issues, then preserve the same applicable wrap-up contract as `ce:work` Phase 4 before outputting `<promise>DONE</promise>`:
 - commit it, push it, and create or update the PR
 - add a `## Post-Deploy Monitoring & Validation` section to the PR description
 - if the change affects browser UI, capture and upload screenshots and include the image URLs in the PR description
+
+Update the manifest after implementation, self-review, verification, and wrap-up so rerunning `/lfg` resumes at the first unmet late-stage gate instead of routing from scratch.
 
 ---
 
@@ -93,20 +120,41 @@ Before invoking downstream skills:
 
 1. Check for an active autopilot manifest for the current branch/worktree.
 2. If one exists, resume from it.
-3. If one does not exist, reconstruct state conservatively using this precedence:
+3. If one does not exist, reconstruct one conservatively using this algorithm:
    - explicit user direction in the current `/lfg` invocation
    - durable workflow artifacts and repo state
    - PR and CI state for the current branch/HEAD
-4. Evaluate ordered workflow gates:
+4. Gather an evidence bundle before inferring any gate state:
+   - current branch/worktree, dirty state, and whether the branch is ahead of the default branch
+   - current `/lfg` feature description, if one was provided
+   - relevant `docs/brainstorms/*-requirements.md` and `docs/plans/*.md` files, preferring artifacts touched on the current branch or referenced by each other
+   - plan checkbox progress and whether non-doc implementation files changed beyond the plan artifact itself
+   - open PR, CI state, and pending/ready todo files in `.context/compound-engineering/todos/`
+5. Select canonical artifacts conservatively:
+   - if a plan references an `origin:` requirements document, bind them together
+   - if multiple plans or requirements docs are plausible, prefer the artifact most clearly tied to the current branch/topic
+   - if multiple candidates remain materially ambiguous after that pass, ask one targeted question instead of guessing
+6. Infer the route before inferring gate state:
+   - choose `full` if a relevant requirements doc or plan doc exists, or the user explicitly asks for structured planning/review
+   - choose `lightweight` if implementation work or a PR exists without durable planning artifacts and the task is clearly bounded
+   - choose `direct` only for a tiny, self-contained change with no durable planning artifacts and no reason to expect multi-step late-stage orchestration
+   - if you are unsure between `lightweight` and `full`, prefer `full`
+7. Backfill gate state conservatively:
+   - `requirements` is `complete` when a requirements doc exists or a plan clearly proves requirements were already resolved; for `direct`/`lightweight`, mark it `skipped` with evidence
+   - `plan` is `complete` only when a plan doc exists; for `direct`/`lightweight`, mark it `skipped` with evidence
+   - `implementation` stays `pending` when work appears in progress or evidence is mixed; mark it `complete` only with strong evidence such as completed plan checkboxes or other durable implementation-complete signals
+   - `review`, `verification`, and `wrap_up` should be marked `complete` only from explicit evidence. Never infer those gates complete from an open PR alone
+8. If no coherent candidate route/artifact set exists, stop and tell the user there is nothing reliable to resume. Ask for a feature description or explicit plan path instead of guessing.
+9. Evaluate ordered workflow gates:
    - `requirements`
    - `plan`
    - `implementation`
    - `review`
    - `verification`
    - `wrap_up`
-5. Mark a gate complete only when current evidence supports it. If you cannot prove a gate is complete, leave it `pending` or `blocked`.
-6. Create or backfill `.context/compound-engineering/autopilot/<run-id>/session.json` and `.context/compound-engineering/autopilot/<run-id>/decisions.md`.
-7. Advance one gate at a time. After each downstream skill returns, update the manifest evidence, recompute the first unmet gate, and continue until all required gates are complete or a real blocker stops the run.
+10. Mark a gate complete only when current evidence supports it. If you cannot prove a gate is complete, leave it `pending`, `skipped`, or `blocked` as appropriate.
+11. Create or backfill `.context/compound-engineering/autopilot/<run-id>/session.json` and `.context/compound-engineering/autopilot/<run-id>/decisions.md`.
+12. Advance one gate at a time. After each downstream skill returns, update the manifest evidence, recompute the first unmet gate, and continue until all required gates are complete or a real blocker stops the run.
 
 Late-stage rule:
 

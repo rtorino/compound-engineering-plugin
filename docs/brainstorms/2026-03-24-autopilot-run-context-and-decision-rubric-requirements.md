@@ -38,6 +38,7 @@ The goal is to make `lfg` the single autopilot entrypoint with a deterministic r
 - R3a. The exact phase-1 manifest shape should be:
   - `run_id`
   - `mode` with the fixed value `autopilot`
+  - `route` with the enum `direct | lightweight | full`
   - `status` with the enum `active | completed | aborted`
   - `implementation_mode` with the enum `standard | swarm`
   - `started_at`
@@ -45,10 +46,10 @@ The goal is to make `lfg` the single autopilot entrypoint with a deterministic r
   - `feature_description`
   - `current_gate`
   - `gates`, keyed by `requirements`, `plan`, `implementation`, `review`, `verification`, and `wrap_up`
-  - `artifacts`, containing `requirements_doc`, `plan_doc`, `decision_log`, and `pr_url` when known
+  - `artifacts`, containing `requirements_doc`, `plan_doc`, and `decision_log`
 
 - R3b. Each manifest gate entry should include:
-  - `state` with the enum `complete | pending | blocked | unknown`
+  - `state` with the enum `complete | skipped | pending | blocked | unknown`
   - `evidence`, as a short list of strings or references explaining why the gate was marked that way
 
 - R3c. Manifest lifecycle should be:
@@ -56,6 +57,8 @@ The goal is to make `lfg` the single autopilot entrypoint with a deterministic r
   - remain `active` while any gate is still `pending` or `blocked`
   - transition to `completed` only when all required gates are `complete` and no required external blocker such as CI remains
   - transition to `aborted` only when the run is intentionally stopped or cannot continue
+
+- R3d. Direct and lightweight routes should still create a manifest immediately. In those routes, `requirements` and `plan` may be marked `skipped` with routing evidence, and `artifacts.requirements_doc` / `artifacts.plan_doc` may remain unset by design.
 
 - R4. Downstream skills must detect autopilot through an explicit, common-denominator invocation marker plus the manifest it points to. The contract must not rely on line breaks, XML parsing, or platform-specific positional argument features.
 

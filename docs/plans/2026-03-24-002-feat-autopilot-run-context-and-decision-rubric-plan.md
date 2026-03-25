@@ -65,6 +65,7 @@ Today the autopilot contract is described in prose across `lfg`, `slfg`, and sev
 - **The manifest also records gate state and completion evidence**: In addition to artifact paths, the run state should capture ordered gate status (`complete`, `pending`, `blocked`, `unknown`) and the evidence used to mark reconstructed gates complete.
 - **The exact phase-1 manifest schema is fixed**: Use:
   - `run_id`
+  - `route` = `direct | lightweight | full`
   - `mode` = `autopilot`
   - `status` = `active | completed | aborted`
   - `implementation_mode` = `standard | swarm`
@@ -72,8 +73,9 @@ Today the autopilot contract is described in prose across `lfg`, `slfg`, and sev
   - `updated_at`
   - `feature_description`
   - `current_gate`
-  - `gates.requirements | gates.plan | gates.implementation | gates.review | gates.verification | gates.wrap_up`, each with `state` = `complete | pending | blocked | unknown` plus `evidence`
-  - `artifacts.requirements_doc | artifacts.plan_doc | artifacts.decision_log | artifacts.pr_url`
+  - `gates.requirements | gates.plan | gates.implementation | gates.review | gates.verification | gates.wrap_up`, each with `state` = `complete | skipped | pending | blocked | unknown` plus `evidence`
+  - `artifacts.requirements_doc | artifacts.plan_doc | artifacts.decision_log`
+  - direct and lightweight routes still create a manifest; they mark `requirements` and `plan` as `skipped` with evidence when those artifacts are intentionally absent
 - **Run status stays coarse; gate state carries detail**: "Waiting on CI" or "review incomplete" should be expressed in gate state and evidence while the overall run remains `active`. Only `completed` and `aborted` are terminal.
 - **`lfg` is the only top-level autopilot entrypoint**: `slfg` should stop owning its own orchestration contract. When users want parallel execution, `lfg` should expose swarm as an execution mode, and `slfg` should become a compatibility wrapper that points there.
 - **Swarm selection belongs behind `lfg`**: In phase 1, swarm should be selected explicitly by user intent. Repo/project defaults should use `compound-engineering.local.md` frontmatter `implementation_mode: standard | swarm`, with missing treated as `standard`.
