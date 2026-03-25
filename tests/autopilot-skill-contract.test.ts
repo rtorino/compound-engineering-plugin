@@ -58,6 +58,9 @@ describe("autopilot skill contract", () => {
     expect(plan).toContain("`Engineer > Product Manager > Designer`")
     expect(plan).toContain("Dominant decision criteria:")
     expect(plan).toContain("update the manifest's `artifacts.plan_doc`")
+    expect(plan).toContain("prefer the document whose topic and problem frame most closely match the current feature description")
+    expect(plan).not.toContain("most recent matching document automatically")
+    expect(plan).not.toContain("Pipeline Mode")
 
     expect(deepenPlan).toContain("`Engineer > Product Manager > Designer`")
     expect(deepenPlan).toContain("keep the canonical decision rows in the run-scoped `decisions.md`")
