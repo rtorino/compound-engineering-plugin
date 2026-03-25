@@ -35,11 +35,14 @@ Follow this priority order for commit messages *and* PR titles:
 Before committing, check whether a PR already exists for the current branch:
 
 ```bash
-command gh pr view --json url,title 2>/dev/null
+command gh pr view --json url,title
 ```
 
-- If **no PR exists**, continue to Step 4 through Step 8 as normal.
-- If **a PR already exists**, note its URL and continue to Step 4 (commit) and Step 5 (push). Then skip to Step 7 (existing PR flow) instead of creating a new PR.
+Interpret the result:
+
+- If it **returns PR data**, note the URL and continue to Step 4 (commit) and Step 5 (push). Then skip to Step 7 (existing PR flow) instead of creating a new PR.
+- If it **errors with "no pull requests found"**, no PR exists. Continue to Step 4 through Step 8 as normal.
+- If it **errors for another reason** (auth, network, repo config), report the error to the user and stop.
 
 ### Step 4: Branch, stage, and commit
 
