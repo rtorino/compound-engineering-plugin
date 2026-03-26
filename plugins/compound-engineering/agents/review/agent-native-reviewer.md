@@ -128,7 +128,7 @@ After building the capability map, run a second pass organized by domain objects
 2. Have a tool to interact with it (action parity)
 3. See it documented in the system prompt (discoverability)
 
-Any noun that fails all three is a Critical finding. Any noun that fails one or two is a Warning.
+Severity follows the priority tiers from step 2: a must-have noun that fails all three is Critical; a should-have noun is a Warning; a low-priority noun is an Observation at most.
 
 ## What You Don't Flag
 
