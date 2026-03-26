@@ -68,12 +68,20 @@ When adding or modifying skills, verify compliance with the skill spec:
 - [ ] `name:` present and matches directory name (lowercase-with-hyphens)
 - [ ] `description:` present and describes **what it does and when to use it** (per official spec: "Explains code with diagrams. Use when exploring how code works.")
 
-### Reference Links (Required if references/ exists)
+### Reference File Inclusion (Required if references/ exists)
 
-- [ ] All files in `references/` that the agent should read into context are linked as `[filename.md](./references/filename.md)`
-- [ ] All files in `assets/` that the agent should read into context are linked as `[filename](./assets/filename)`
-- [ ] For files the agent needs to *read* (references, assets), use markdown links -- these signal "load this into context"
-- [ ] For files the agent needs to *execute* (scripts), backtick paths are sufficient (e.g., `` `scripts/my-script` ``) since the bash code block already provides the invocation
+- [ ] Do NOT use markdown links like `[filename.md](./references/filename.md)` -- agents interpret these as Read instructions with CWD-relative paths, which fail because the CWD is never the skill directory
+- [ ] **Default: use backtick paths.** Most reference files should be referenced with backtick paths so the agent can load them on demand:
+  ```
+  `references/architecture-patterns.md`
+  ```
+  This keeps the skill lean and avoids inflating the token footprint at load time. Use for: large reference docs, routing-table targets, code scaffolds, executable scripts/templates
+- [ ] **Exception: `@` inline for small structural files** that the skill cannot function without and that are under ~150 lines (schemas, output contracts, subagent dispatch templates). Use `@` file inclusion on its own line:
+  ```
+  @./references/schema.json
+  ```
+  This resolves relative to the SKILL.md and substitutes content before the model sees it. If a file is over ~150 lines, prefer a backtick path even if it is always needed
+- [ ] For files the agent needs to *execute* (scripts, shell templates), always use backtick paths -- `@` would inline the script as text content instead of keeping it as an executable file
 
 ### Writing Style
 
@@ -121,9 +129,8 @@ Why: shell-heavy exploration causes avoidable permission prompts in sub-agent wo
 ### Quick Validation Command
 
 ```bash
-# Check for unlinked references in a skill
-grep -E '`(references|assets|scripts)/[^`]+`' skills/*/SKILL.md
-# Should return nothing if all refs are properly linked
+# Check for broken markdown link references (should return nothing)
+grep -E '\[.*\]\(\./references/|\[.*\]\(\./assets/|\[.*\]\(references/|\[.*\]\(assets/' skills/*/SKILL.md
 
 # Check description format - should describe what + when
 grep -E '^description:' skills/*/SKILL.md
@@ -136,11 +143,11 @@ grep -E '^description:' skills/*/SKILL.md
 
 ## Upstream-Sourced Skills
 
-Some skills are exact copies from external upstream repositories, vendored locally so the plugin is self-contained. Do not add local modifications -- sync from upstream instead.
+Some skills are exact copies from external upstream repositories, vendored locally so the plugin is self-contained. Prefer syncing from upstream, but apply the reference file inclusion rules from the skill compliance checklist after each sync -- upstream skills often use markdown links for references which break in plugin contexts.
 
-| Skill | Upstream |
-|-------|----------|
-| `agent-browser` | `github.com/vercel-labs/agent-browser` (`skills/agent-browser/SKILL.md`) |
+| Skill | Upstream | Local deviations |
+|-------|----------|------------------|
+| `agent-browser` | `github.com/vercel-labs/agent-browser` (`skills/agent-browser/SKILL.md`) | Markdown link refs replaced with backtick paths to fix CWD resolution bug (#374) |
 
 ## Beta Skills
 

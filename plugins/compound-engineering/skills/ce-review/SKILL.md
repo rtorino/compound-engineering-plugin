@@ -73,7 +73,7 @@ Routing rules:
 
 ## Reviewers
 
-13 reviewer personas in layered conditionals, plus CE-specific agents. See [persona-catalog.md](./references/persona-catalog.md) for the full catalog.
+13 reviewer personas in layered conditionals, plus CE-specific agents. See the persona catalog included below for the full catalog.
 
 **Always-on (every review):**
 
@@ -324,7 +324,7 @@ Pass this to every reviewer in their spawn prompt. Intent shapes *how hard each 
 
 ### Stage 3: Select reviewers
 
-Read the diff and file list from Stage 1. The 3 always-on personas and 2 CE always-on agents are automatic. For each cross-cutting and stack-specific conditional persona in [persona-catalog.md](./references/persona-catalog.md), decide whether the diff warrants it. This is agent judgment, not keyword matching.
+Read the diff and file list from Stage 1. The 3 always-on personas and 2 CE always-on agents are automatic. For each cross-cutting and stack-specific conditional persona in the persona catalog included below, decide whether the diff warrants it. This is agent judgment, not keyword matching.
 
 Stack-specific personas are additive. A Rails UI change may warrant `kieran-rails` plus `julik-frontend-races`; a TypeScript API diff may warrant `kieran-typescript` plus `api-contract` and `reliability`.
 
@@ -350,18 +350,18 @@ This is progress reporting, not a blocking confirmation.
 
 ### Stage 4: Spawn sub-agents
 
-Spawn each selected persona reviewer as a parallel sub-agent using the template in [subagent-template.md](./references/subagent-template.md). Each persona sub-agent receives:
+Spawn each selected persona reviewer as a parallel sub-agent using the subagent template included below. Each persona sub-agent receives:
 
 1. Their persona file content (identity, failure modes, calibration, suppress conditions)
-2. Shared diff-scope rules from [diff-scope.md](./references/diff-scope.md)
-3. The JSON output contract from [findings-schema.json](./references/findings-schema.json)
+2. Shared diff-scope rules from the diff-scope reference included below
+3. The JSON output contract from the findings schema included below
 4. Review context: intent summary, file list, diff
 
 Persona sub-agents are **read-only**: they review and return structured JSON. They do not edit files or propose refactors.
 
 Read-only here means **non-mutating**, not "no shell access." Reviewer sub-agents may use non-mutating inspection commands when needed to gather evidence or verify scope, including read-oriented `git` / `gh` usage such as `git diff`, `git show`, `git blame`, `git log`, and `gh pr view`. They must not edit files, change branches, commit, push, create PRs, or otherwise mutate the checkout or repository state.
 
-Each persona sub-agent returns JSON matching [findings-schema.json](./references/findings-schema.json):
+Each persona sub-agent returns JSON matching the findings schema included below:
 
 ```json
 {
@@ -395,7 +395,7 @@ Convert multiple reviewer JSON payloads into one deduplicated, confidence-gated 
 
 ### Stage 6: Synthesize and present
 
-Assemble the final report using the template in [review-output-template.md](./references/review-output-template.md):
+Assemble the final report using the review output template included below:
 
 1. **Header.** Scope, intent, mode, reviewer team with per-conditional justifications.
 2. **Findings.** Grouped by severity (P0, P1, P2, P3). Each finding shows file, issue, reviewer(s), confidence, and synthesized route.
@@ -517,3 +517,27 @@ If "Push fixes": push the branch with `git push` to update the existing PR.
 ## Fallback
 
 If the platform doesn't support parallel sub-agents, run reviewers sequentially. Everything else (stages, output format, merge pipeline) stays the same.
+
+---
+
+## Included References
+
+### Persona Catalog
+
+@./references/persona-catalog.md
+
+### Subagent Template
+
+@./references/subagent-template.md
+
+### Diff Scope Rules
+
+@./references/diff-scope.md
+
+### Findings Schema
+
+@./references/findings-schema.json
+
+### Review Output Template
+
+@./references/review-output-template.md
