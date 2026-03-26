@@ -503,7 +503,7 @@ If a doc cluster has 3+ overlapping docs, process pairwise: consolidate the two 
 
 Process Replace candidates **one at a time, sequentially**. Each replacement is written by a subagent to protect the main context window.
 
-When a replacement is needed, read the documentation contract files (mirrored from `ce:compound`) and pass their contents into the replacement subagent's task prompt:
+When a replacement is needed, read the documentation contract files and pass their contents into the replacement subagent's task prompt:
 
 - `references/schema.yaml` — frontmatter fields and enum values
 - `references/yaml-schema.md` — category mapping
