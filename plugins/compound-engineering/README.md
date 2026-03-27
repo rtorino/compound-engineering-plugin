@@ -126,6 +126,7 @@ Agents are specialized subagents invoked by skills — you typically don't call 
 | `security-reviewer` | Exploitable vulnerabilities with confidence calibration |
 | `security-sentinel` | Security audits and vulnerability assessments |
 | `testing-reviewer` | Test coverage gaps, weak assertions |
+| `project-standards-reviewer` | CLAUDE.md and AGENTS.md compliance |
 
 ### Document Review
 

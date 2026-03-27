@@ -1,8 +1,8 @@
 # Persona Catalog
 
-13 reviewer personas organized into always-on, cross-cutting conditional, and stack-specific conditional layers, plus CE-specific agents. The orchestrator uses this catalog to select which reviewers to spawn for each review.
+14 reviewer personas organized into always-on, cross-cutting conditional, and stack-specific conditional layers, plus CE-specific agents. The orchestrator uses this catalog to select which reviewers to spawn for each review.
 
-## Always-on (3 personas + 2 CE agents)
+## Always-on (4 personas + 2 CE agents)
 
 Spawned on every review regardless of diff content.
 
@@ -13,6 +13,7 @@ Spawned on every review regardless of diff content.
 | `correctness` | `compound-engineering:review:correctness-reviewer` | Logic errors, edge cases, state bugs, error propagation, intent compliance |
 | `testing` | `compound-engineering:review:testing-reviewer` | Coverage gaps, weak assertions, brittle tests, missing edge case tests |
 | `maintainability` | `compound-engineering:review:maintainability-reviewer` | Coupling, complexity, naming, dead code, premature abstraction |
+| `project-standards` | `compound-engineering:review:project-standards-reviewer` | CLAUDE.md and AGENTS.md compliance -- frontmatter, references, naming, cross-platform portability, tool selection |
 
 **CE agents (unstructured output, synthesized separately):**
 
@@ -56,7 +57,7 @@ These CE-native agents provide specialized analysis beyond what the persona agen
 
 ## Selection rules
 
-1. **Always spawn all 3 always-on personas** plus the 2 CE always-on agents.
+1. **Always spawn all 4 always-on personas** plus the 2 CE always-on agents.
 2. **For each cross-cutting conditional persona**, the orchestrator reads the diff and decides whether the persona's domain is relevant. This is a judgment call, not a keyword match.
 3. **For each stack-specific conditional persona**, use file types and changed patterns as a starting point, then decide whether the diff actually introduces meaningful work for that reviewer. Do not spawn language-specific reviewers just because one config or generated file happens to match the extension.
 4. **For CE conditional agents**, spawn when the diff includes migration files (`db/migrate/*.rb`, `db/schema.rb`) or data backfill scripts.

@@ -127,6 +127,10 @@ Why: shell-heavy exploration causes avoidable permission prompts in sub-agent wo
 - [ ] Do not encode shell recipes for routine exploration when native tools can do the job; encode intent and preferred tool classes instead
 - [ ] For shell-only workflows (e.g., `gh`, `git`, `bundle show`, project CLIs), explicit command examples are acceptable when they are simple, task-scoped, and not chained together
 
+### Passing Reference Material to Sub-Agents
+
+When a skill orchestrates sub-agents that need codebase reference material, prefer passing file paths over file contents. The sub-agent reads only what it needs. Content-passing is fine for small, static material consumed in full (e.g., a JSON schema under ~50 lines).
+
 ### Quick Validation Command
 
 ```bash
