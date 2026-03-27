@@ -36,10 +36,14 @@ If empty (detached HEAD), report that there is no branch to update and stop.
 Otherwise, check for an existing open PR:
 
 ```bash
-gh pr list --head "<branch>" --json url,title,state --jq '.[0] // empty'
+gh pr view --json url,title,state
 ```
 
-If no PR is found, report that no open PR exists for this branch and stop.
+Interpret the result:
+
+- If it returns PR data, an open PR exists for the current branch.
+- If it errors because no pull request exists for the current branch, report that no open PR exists for this branch and stop.
+- If it errors for another reason (auth, network, repo config), report the error and stop.
 
 ### DU-3: Write and apply the updated description
 
@@ -88,17 +92,24 @@ gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'
 
 If both fail, fall back to `main`.
 
-If `git branch --show-current` returned an empty result, the repository is in detached HEAD state. Explain that a branch is required before committing and pushing. Ask whether to create a feature branch now. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If no question tool is available, present the options and wait for the user's reply.
+Run `git branch --show-current`. If it returns an empty result, the repository is in detached HEAD state. Explain that a branch is required before committing and pushing. Ask whether to create a feature branch now. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If no question tool is available, present the options and wait for the user's reply.
 
-- If the user agrees, derive a descriptive branch name from the change content, create it with `git checkout -b <branch-name>`, and use this new name as the branch name for the rest of the workflow.
+- If the user agrees, derive a descriptive branch name from the change content, create it with `git checkout -b <branch-name>`, then run `git branch --show-current` again and use that result as the current branch name for the rest of the workflow.
 - If the user declines, stop.
 
-If there are no working tree changes (nothing staged, nothing modified), check whether there are unpushed commits or a missing PR before stopping:
+If the `git status` result from this step shows a clean working tree (no staged, modified, or untracked files), check whether there are unpushed commits or a missing PR before stopping:
 
-1. Check for unpushed commits: `git log @{u}..HEAD --oneline 2>/dev/null` (empty output means nothing to push; an error means no upstream is configured, so the branch needs its first push — treat as unpushed).
-2. Check for an existing PR using the method in Step 3.
+1. Run `git branch --show-current` to get the current branch name.
+2. Run `git rev-parse --abbrev-ref --symbolic-full-name @{u}` to check whether an upstream is configured.
+3. If the command succeeds, run `git log <upstream>..HEAD --oneline` using the upstream name from the previous command.
+4. If an upstream is configured, check for an existing PR using the method in Step 3.
 
+- If the current branch is `main`, `master`, or the resolved default branch from Step 1 and there is **no upstream** or there are **unpushed commits**, explain that pushing now would use the default branch directly. Ask whether to create a feature branch first. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If no question tool is available, present the options and wait for the user's reply.
+- If the user agrees, derive a descriptive branch name from the change content, create it with `git checkout -b <branch-name>`, then continue from Step 5 (push).
+- If the user declines, report that this workflow cannot open a PR from the default branch directly and stop.
+- If there is **no upstream**, treat the branch as needing its first push. Skip Step 4 (commit) and continue from Step 5 (push).
 - If there are **unpushed commits**, skip Step 4 (commit) and continue from Step 5 (push).
+- If all commits are pushed but **no open PR exists** and the current branch is `main`, `master`, or the resolved default branch from Step 1, report that there is no feature branch work to open as a PR and stop.
 - If all commits are pushed but **no open PR exists**, skip Steps 4-5 and continue from Step 6 (write the PR description) and Step 7 (create the PR).
 - If all commits are pushed **and an open PR exists**, report that and stop -- there is nothing to do.
 
@@ -112,23 +123,23 @@ Follow this priority order for commit messages *and* PR titles:
 
 ### Step 3: Check for existing PR
 
-Check for an existing open PR:
+Run `git branch --show-current` to get the current branch name. If it returns an empty result here, report that the workflow is still in detached HEAD state and stop.
+
+Then check for an existing open PR:
 
 ```bash
-gh pr list --head "<branch>" --json url,title,state --jq '.[0] // empty'
+gh pr view --json url,title,state
 ```
-
-Replace `<branch>` with the current branch name (from Step 1, or the newly created branch if Step 1 resolved a detached HEAD). The default `--state open` filter ensures only active PRs are matched -- closed or merged PRs are ignored automatically, so a new PR will be created.
 
 Interpret the result:
 
-- If it **returns PR data**, an open PR exists. Note the URL and continue to Step 4 (commit) and Step 5 (push). Then skip to Step 7 (existing PR flow) instead of creating a new PR.
-- If it **returns empty/nothing**, no open PR exists. Continue to Step 4 through Step 8 as normal.
+- If it **returns PR data**, an open PR exists for the current branch. Note the URL and continue to Step 4 (commit) and Step 5 (push). Then skip to Step 7 (existing PR flow) instead of creating a new PR.
+- If it **errors because no pull request exists for the current branch**, no PR exists. Continue to Step 4 through Step 8 as normal.
 - If it **errors** (auth, network, repo config), report the error to the user and stop.
 
 ### Step 4: Branch, stage, and commit
 
-1. If on `main`, `master`, or the resolved default branch from Step 1, create a descriptive feature branch first (`git checkout -b <branch-name>`). Derive the branch name from the change content.
+1. Run `git branch --show-current`. If it returns `main`, `master`, or the resolved default branch from Step 1, create a descriptive feature branch first with `git checkout -b <branch-name>`. Derive the branch name from the change content.
 2. Before staging everything together, scan the changed files for naturally distinct concerns. If modified files clearly group into separate logical changes (e.g., a refactor in one set of files and a new feature in another), create separate commits for each group. Keep this lightweight -- group at the **file level only** (no `git add -p`), split only when obvious, and aim for two or three logical commits at most. If it's ambiguous, one commit is fine.
 3. Stage relevant files by name. Avoid `git add -A` or `git add .` to prevent accidentally including sensitive files.
 4. Commit following the conventions from Step 2. Use a heredoc for the message.
