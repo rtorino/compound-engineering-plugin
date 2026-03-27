@@ -150,7 +150,8 @@ Compute the diff range, file list, and diff. Minimize permission prompts by comb
 The caller already knows the diff base. Skip all base-branch detection, remote resolution, and merge-base computation. Use the provided value directly:
 
 ```
-BASE=$(git merge-base HEAD {base_arg} 2>/dev/null) || BASE={base_arg}
+BASE_ARG="{base_arg}"
+BASE=$(git merge-base HEAD "$BASE_ARG" 2>/dev/null) || BASE="$BASE_ARG"
 ```
 
 Then produce the same output as the other paths:
