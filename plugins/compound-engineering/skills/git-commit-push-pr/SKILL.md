@@ -306,7 +306,7 @@ The bar for including visual aids in PR descriptions is higher than in brainstor
 | Data model changes with 3+ related entities or relationship changes | Mermaid ERD or relationship diagram | Within the changes section |
 
 **When to skip:**
-- The change is small or simple -- if the sizing table routes to "1-2 sentences" or "3-5 sentences", skip visual aids
+- The change is trivial -- if the sizing table routes to "1-2 sentences", skip visual aids
 - Prose already communicates the change clearly
 - The diagram would just restate the diff in visual form without adding comprehension value
 - The change is mechanical (renames, dependency bumps, config changes, formatting)
