@@ -163,16 +163,9 @@ If a reviewer flags any file in these directories for cleanup or removal, discar
 
 Compute the diff range, file list, and diff. Minimize permission prompts by combining into as few commands as possible.
 
-**Bot-PR eligibility check (PR path only):** When a PR number or GitHub URL is provided, check the PR author before proceeding:
-
-```
-gh pr view <number-or-url> --json author --jq '.author.login'
-```
-
-If the author is a known bot (`dependabot[bot]`, `renovate[bot]`, `github-actions[bot]`, `snyk-bot`), handle by mode:
-- **Interactive:** Warn the user: "This PR was authored by `<author>` (a dependency bot). Bot PRs are mechanical dependency bumps that rarely benefit from a full code review. Continue anyway?" Proceed only if the user confirms.
-- **Headless/autofix:** Emit `Review skipped (headless mode). Reason: bot-authored PR (<author>). Bot PRs are mechanical dependency bumps.` followed by "Review complete". Stop.
-- **Report-only:** Emit a note that this is a bot-authored PR and proceed with a minimal review (always-on personas only, skip all conditionals).
+**Bot-PR eligibility check (PR path only):** When a PR number or GitHub URL is provided, check the PR author as part of fetching PR metadata. If the author is a known bot (`dependabot[bot]`, `renovate[bot]`, `github-actions[bot]`, `snyk-bot`):
+- **Headless/autofix:** Emit `Review skipped (headless mode). Reason: bot-authored PR (<author>). Bot PRs are mechanical dependency bumps.` followed by "Review complete". Stop — these modes are token-sensitive and bot PRs provide no value.
+- **Interactive/report-only:** Proceed normally. The user explicitly requested this review.
 
 **If `base:` argument is provided (fast path):**
 
@@ -298,11 +291,6 @@ echo "BASE:$BASE" && echo "FILES:" && git diff --name-only $BASE && echo "DIFF:"
 ```
 
 Using `git diff $BASE` (without `..HEAD`) diffs the merge-base against the working tree, which includes committed, staged, and unstaged changes together.
-
-**Large diff handling:** If the diff exceeds ~8,000 lines, the full diff may degrade reviewer quality (context window pressure, attention dilution). Handle this by:
-1. Pass the full file list to all reviewers so they understand the change scope.
-2. Split the diff into logical chunks by directory or module (e.g., `app/models/`, `app/controllers/`, `tests/`). Spawn each persona reviewer once per chunk rather than once with the entire diff.
-3. Note the chunking strategy and total diff size in the Coverage section of the output.
 
 **Untracked file handling:** Always inspect the `UNTRACKED:` list, even when `FILES:`/`DIFF:` are non-empty. Untracked files are outside review scope until staged. If the list is non-empty, tell the user which files are excluded. If any of them should be reviewed, stop and tell the user to `git add` them first and rerun. Only continue when the user is intentionally reviewing tracked changes only. In `mode:headless` or `mode:autofix`, do not stop to ask — proceed with tracked changes only and note the excluded untracked files in the Coverage section of the output.
 
