@@ -132,7 +132,7 @@ Process all three feedback types. Review threads are the primary type; PR commen
 
 #### Individual dispatch (default)
 
-**For review threads** (`review_threads`): Spawn a `compound-engineering:workflow:pr-comment-resolver` agent for each.
+**For review threads** (`review_threads`): Spawn a `compound-engineering:workflow:pr-comment-resolver` agent for each thread that is NOT already assigned to a cluster from step 3. Clustered threads are handled by cluster dispatch below -- do not dispatch them individually.
 
 Each agent receives:
 - The thread ID
@@ -141,7 +141,7 @@ Each agent receives:
 - The PR number (for context)
 - The feedback type (`review_thread`)
 
-**For PR comments and review bodies** (`pr_comments`, `review_bodies`): These lack file/line context. Spawn a `compound-engineering:workflow:pr-comment-resolver` agent for each actionable item. The agent receives the comment ID, body text, PR number, and feedback type (`pr_comment` or `review_body`). The agent must identify the relevant files from the comment text and the PR diff.
+**For PR comments and review bodies** (`pr_comments`, `review_bodies`): These lack file/line context. Spawn a `compound-engineering:workflow:pr-comment-resolver` agent for each actionable non-clustered item. The agent receives the comment ID, body text, PR number, and feedback type (`pr_comment` or `review_body`). The agent must identify the relevant files from the comment text and the PR diff.
 
 #### Cluster dispatch
 
