@@ -207,7 +207,6 @@ describe("resolve-base.sh", () => {
     await runCommand(["git", "clone", "--depth", "1", bareUrl, checkoutRoot], os.tmpdir(), gitEnv)
     await runGit(["fetch", "--depth", "1", "origin", "feature"], checkoutRoot)
     await runGit(["checkout", "--detach", featureSha], checkoutRoot)
-    await runGit(["branch", "-D", "main"], checkoutRoot)
 
     const originHead = await runGit(
       ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
