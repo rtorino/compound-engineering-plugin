@@ -87,7 +87,9 @@ Scan the repo before substantive brainstorming. Match depth to scope:
 
 *Topic Scan* — Search for relevant terms. Read the most relevant existing artifact if one exists (brainstorm, plan, spec, skill, feature doc). Skim adjacent examples covering similar behavior.
 
-If nothing obvious appears after a short scan, say so and continue. Do not drift into technical planning — avoid inspecting tests, migrations, deployment, or low-level architecture unless the brainstorm is itself about a technical decision.
+If nothing obvious appears after a short scan, say so and continue. Do not drift into technical design — avoid deciding implementation details like schemas, migration strategies, endpoint structure, or deployment topology. Those decisions belong in planning, not brainstorming.
+
+However, *verifying* what currently exists is not technical design — it is fact-checking. When the brainstorm touches infrastructure that can be checked (database tables, routes, config files, dependencies, model definitions), read the relevant source files to confirm what is actually present before making claims. Never state "X does not exist" or "Y is absent" as fact without verification; if the source has not been checked, label the claim as an unverified assumption.
 
 #### 1.2 Product Pressure Test
 
