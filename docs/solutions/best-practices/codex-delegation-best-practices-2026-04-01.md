@@ -35,18 +35,46 @@ The evaluation spanned iterations 1-6, testing small (1-2 units), medium (4 unit
 
 ## Guidance
 
-### The Crossover Point: 5-7 Units
+### Token Economics
 
-Delegation breaks even at approximately 5-7 units and becomes progressively cheaper above that threshold.
+Delegation has a fixed orchestration cost per batch (~4-5k Claude tokens for prompt generation, codex exec, result classification, and commit) and a variable savings per unit (~3-5k Claude tokens of code-writing avoided). The crossover depends on how many units are batched per call.
 
-| Plan size | Units | Delegation overhead vs standard | Verdict |
-|-----------|-------|---------------------------------|---------|
-| Small | 1-3 | +34% to +50% more Claude tokens | Not worth it for token savings alone |
-| Medium | 4 | +2% to +15% more | Marginal |
-| Large | 7 | ~+1% | Break-even |
-| Extra-large | 10 | Delegation is cheaper (54k vs 62k) | Clear win |
+**Crossover by plan size:**
 
-Below 5 units, orchestration overhead dominates. Above 7 units, code-writing savings dominate. The crossover scales linearly: each additional unit in a batch saves ~3-5k tokens while adding zero orchestration cost.
+| Plan size | Units | Delegate tokens | Standard tokens | Overhead | Verdict |
+|-----------|-------|----------------|-----------------|----------|---------|
+| Small (bug fix) | 1 | 51k | 38k | +34% | Not worth it for token savings |
+| Small (new feature) | 1 | 63k | 42k | +50% | Not worth it for token savings |
+| Medium | 4 | 54k | 53k | +2% | Marginal |
+| Large | 7 | 62k | 62k | +1% | Break-even |
+| Extra-large | 10 | 54k | 62k* | **-13%** | Delegation is cheaper |
+
+*Standard mode extrapolated from 7-unit baseline. The XL delegate cost (54k) is lower than the 7-unit standard cost (62k) because orchestration is amortized over more units per batch.
+
+**How it scales:** Each additional unit in a batch saves ~3-5k Claude tokens while adding zero orchestration cost. The orchestration is per-batch, not per-unit. A 10-unit plan in 2 batches costs ~8-10k in orchestration regardless of whether those batches contain 5 units or 50 lines of code each.
+
+**The crossover point is ~5-7 units.** Below that, orchestration overhead dominates. Above it, code-writing savings dominate. Users may still choose delegation below the crossover for cost arbitrage (Codex tokens are cheaper than Claude tokens) or coding preference.
+
+**Wall clock time cost:** Delegation is 1.7-2.2x slower due to codex exec latency:
+
+| Plan size | Delegate time | Standard time | Slowdown |
+|-----------|---------------|---------------|----------|
+| Medium (4 units) | 353s | 188s | 1.9x |
+| Large (7 units) | 569s | 254s | 2.2x |
+| Extra-large (10 units) | 574s | ~300s* | ~1.9x |
+
+**Test coverage cost:** Without explicit testing guidance in the prompt, Codex produces 15-43% fewer tests than Claude. Adding the `<testing>` section to the prompt closed this gap by ~35% on large plans (see Prompt Engineering section below).
+
+**Evolution across iterations:**
+
+| Iteration | Architecture | Medium delegate tokens | Change |
+|-----------|-------------|----------------------|--------|
+| 3 | Per-unit loop, all content in SKILL.md body (776 lines) | 58k | Baseline |
+| 4 | Added optimizations to body (~810 lines) | 79k | +38% (worse — body growth overwhelmed savings) |
+| 5 | Extracted to reference file, batched model (514 lines) | 61k | -23% from iter-4, back to baseline |
+| 6 | Added `<testing>` to prompt | 54k | -7% (with better test quality) |
+
+The key lesson from iteration 4: adding content to the skill body increases cost on every tool call. Optimizations that save a few tool calls but add 50+ lines to the body can be net negative.
 
 ### Skill Body Size is the Multiplicative Cost Driver
 
