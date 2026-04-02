@@ -203,18 +203,23 @@ If tracked files are dirty, stop and present options: (1) commit current changes
 2. Execute the Codex CLI verbatim:
 
 ```bash
+# Resolve sandbox flag
 if [ "$SANDBOX_MODE" = "full-auto" ]; then
   SANDBOX_FLAG="--full-auto"
 else
-  SANDBOX_FLAG="--yolo"
+  SANDBOX_FLAG="--dangerously-bypass-approvals-and-sandbox"
 fi
 
 codex exec \
+  -m "<delegate_model>" \
+  -c 'model_reasoning_effort="<delegate_effort>"' \
   $SANDBOX_FLAG \
   --output-schema .context/compound-engineering/codex-delegation/<run-id>/result-schema.json \
   -o .context/compound-engineering/codex-delegation/<run-id>/result-batch-<batch-num>.json \
   - < .context/compound-engineering/codex-delegation/<run-id>/prompt-batch-<batch-num>.md
 ```
+
+Quoting is critical for the `-c` flag: use single quotes around the entire key=value and double quotes around the TOML string value inside. Example: `-c 'model_reasoning_effort="high"'`. The `-m` value does not need special quoting unless the model name contains spaces.
 
 Do not improvise CLI flags or modify this invocation template.
 

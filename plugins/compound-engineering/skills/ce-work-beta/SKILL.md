@@ -48,12 +48,16 @@ Also read from local.md when present:
 - `work_delegate_consent` -- `true` or default `false`
 - `work_delegate_sandbox` -- `yolo` (default) or `full-auto`
 - `work_delegate_decision` -- `auto` (default) or `ask`
+- `work_delegate_model` -- Codex model to use (default `gpt-5.4`). Passthrough — any valid model name accepted.
+- `work_delegate_effort` -- `minimal`, `low`, `medium`, `high` (default), or `xhigh`
 
 Store the resolved state for downstream consumption:
 - `delegation_active` -- boolean, whether delegation mode is on
 - `delegation_source` -- `argument` or `local.md` or `default` -- how delegation was resolved (used by environment guard to decide notification verbosity)
 - `sandbox_mode` -- `yolo` or `full-auto` (from local.md or default `yolo`)
 - `consent_granted` -- boolean (from local.md `work_delegate_consent`)
+- `delegate_model` -- string (from local.md or default `gpt-5.4`)
+- `delegate_effort` -- string (from local.md or default `high`)
 
 ---
 
