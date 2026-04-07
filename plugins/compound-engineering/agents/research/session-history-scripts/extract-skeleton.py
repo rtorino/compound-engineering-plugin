@@ -16,8 +16,29 @@ Outputs a _meta line at the end with processing stats.
 """
 import sys
 import json
+import re
 
 stats = {"lines": 0, "parse_errors": 0, "user": 0, "assistant": 0, "tool": 0}
+
+# Claude Code wrapper tags to strip from user message content.
+# task-notification and local-command-caveat: strip entirely (tag + content).
+# command-message, command-name, command-args: strip tags, keep content.
+_STRIP_BLOCK = re.compile(
+    r"<(?:task-notification|local-command-caveat|system-reminder)[^>]*>.*?</(?:task-notification|local-command-caveat|system-reminder)>",
+    re.DOTALL,
+)
+_STRIP_TAG = re.compile(
+    r"</?(?:command-message|command-name|command-args)[^>]*>"
+)
+
+
+def clean_claude_text(text):
+    """Strip Claude Code framework wrapper tags from message text."""
+    text = _STRIP_BLOCK.sub("", text)
+    text = _STRIP_TAG.sub("", text)
+    # Collapse runs of whitespace left by removed blocks
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text
 
 # Buffer for pending tool entries: [{"ts", "name", "target", "status"}]
 pending_tools = []
@@ -117,11 +138,13 @@ def handle_claude(obj):
             ]
             content = " ".join(texts)
 
-        if isinstance(content, str) and len(content) > 15:
-            flush_tools()
-            print(f"[{ts}] [user] {content[:800]}")
-            print("---")
-            stats["user"] += 1
+        if isinstance(content, str):
+            content = clean_claude_text(content)
+            if len(content) > 15:
+                flush_tools()
+                print(f"[{ts}] [user] {content[:800]}")
+                print("---")
+                stats["user"] += 1
 
     elif msg_type == "assistant":
         msg = obj.get("message", {})
