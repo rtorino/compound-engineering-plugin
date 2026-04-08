@@ -55,7 +55,7 @@ Search Claude Code, Codex, and Cursor session history. A developer may use any c
 
 ### Claude Code
 
-Sessions stored at `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`, where `<encoded-cwd>` replaces `/` with `-` in the working directory path (e.g., `/Users/alice/Code/my-project` becomes `-Users-alice-Code-my-project`).
+Sessions stored at `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`, where `<encoded-cwd>` replaces `/` with `-` in the working directory path (e.g., `/Users/alice/Code/my-project` becomes `-Users-alice-Code-my-project`). Claude Code retains session history for ~30 days by default. Wider scan tiers (90 days) may find nothing unless the user has extended retention. Codex and Cursor may retain longer.
 
 Key message types:
 - `type: "user"` -- Human messages. First user message includes `gitBranch` and `cwd` metadata.
