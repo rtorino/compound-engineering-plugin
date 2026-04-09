@@ -200,7 +200,7 @@ Initialize a `consecutive_failures` counter at 0 before the first batch.
 git diff --quiet HEAD
 ```
 
-This intentionally ignores untracked files. Only staged or unstaged modifications to tracked files make rollback unsafe.
+This intentionally ignores untracked files. Only staged or unstaged modifications to tracked files make rollback unsafe. However, if untracked files exist at paths in the batch's planned Files list, rollback (`git clean -fd -- <paths>`) would delete them. If such overlaps are detected, warn the user and recommend committing or stashing those files before proceeding.
 
 If tracked files are dirty, stop and present options: (1) commit current changes, (2) stash explicitly (`git stash push -m "pre-delegation"`), (3) continue in standard mode (sets `delegation_active` to false). Do not auto-stash user changes.
 
