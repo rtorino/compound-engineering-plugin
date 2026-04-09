@@ -42,11 +42,11 @@ Display the script's output to the user.
 
 After the diagnostic report, check whether:
 
-- any dependencies are missing (reported as red or skip in the script output)
+- any dependencies are missing (reported as red in the script output)
 - `compound-engineering.local.md` is present and needs cleanup
-- `.compound-engineering/config.local.yaml` is not safely gitignored
+- `.compound-engineering/config.local.yaml` does not exist or is not safely gitignored
 
-If everything is installed and no repo-local CE cleanup is needed, display:
+If everything is installed and no repo-local issues were flagged, display:
 
 ```
 Environment healthy -- all dependencies found.
@@ -67,15 +67,32 @@ If any installable dependencies are missing, proceed to Phase 2.
 
 If `compound-engineering.local.md` exists, explain that it is obsolete because review-agent selection is automatic and CE now uses `.compound-engineering/config.local.yaml` for any surviving machine-local state. Ask whether to delete it now.
 
-If `.compound-engineering/config.local.yaml` should be machine-local in this repo and the diagnostic reported that it is not safely gitignored, offer to add this line to `.gitignore`:
+### Step 5: Bootstrap Project Config
+
+If `.compound-engineering/config.local.yaml` does not exist in the current repo, ask whether to create it:
+
+```
+Create .compound-engineering/config.local.yaml with default settings?
+This file stores machine-local Compound Engineering options (e.g., Codex delegation).
+All settings are commented out by default.
+
+1. Yes
+2. No
+```
+
+If the user approves:
+
+1. Create the `.compound-engineering/` directory if it does not exist.
+2. Copy the template from `references/config-template.yaml` to `.compound-engineering/config.local.yaml`.
+3. If `.compound-engineering/config.local.yaml` is not already covered by `.gitignore`, offer to add the entry:
 
 ```text
 .compound-engineering/config.local.yaml
 ```
 
-If the user approves, add the entry exactly once. If the user declines, continue after warning that the file may be committed accidentally.
+If the file already exists, check whether it is safely gitignored. If not, offer to add the `.gitignore` entry as above.
 
-### Step 5: Offer Installation
+### Step 6: Offer Installation
 
 Present the missing dependencies grouped by tier using a multiSelect question. Pre-select recommended items. Use the install commands and URLs from the script's diagnostic output.
 
@@ -94,7 +111,7 @@ Optional:
 
 Only show dependencies that are actually missing. Omit installed ones.
 
-### Step 6: Install Selected Dependencies
+### Step 7: Install Selected Dependencies
 
 For each selected dependency, in order:
 
@@ -114,7 +131,7 @@ For each selected dependency, in order:
 
 4. **If verification fails or install errors:** Display the project URL as fallback and continue to the next dependency.
 
-### Step 7: Summary
+### Step 8: Summary
 
 Display a brief summary:
 
