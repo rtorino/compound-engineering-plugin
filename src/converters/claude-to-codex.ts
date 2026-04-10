@@ -74,6 +74,7 @@ export function convertClaudeToCodex(
   const generatedSkills = [...commandSkills, ...agentSkills]
 
   return {
+    pluginName: plugin.manifest.name,
     prompts,
     skillDirs,
     generatedSkills,

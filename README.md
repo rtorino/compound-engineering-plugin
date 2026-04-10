@@ -115,7 +115,7 @@ bunx @every-env/compound-plugin install compound-engineering --to all
 | Target | Output path | Notes |
 |--------|------------|-------|
 | `opencode` | `~/.config/opencode/` | Commands as `.md` files; `opencode.json` MCP config deep-merged; backups made before overwriting |
-| `codex` | `~/.codex/prompts` + `~/.codex/skills` | Claude commands become prompt + skill pairs; all skills copied directly; deprecated `workflows:*` aliases are omitted |
+| `codex` | `~/.codex/prompts` + `~/.codex/<plugin>/skills` exposed via `~/.agents/skills/<plugin>` | Claude commands become prompt + skill pairs; canonical `ce:*` workflow skills also get prompt wrappers; deprecated `workflows:*` aliases are omitted |
 | `droid` | `~/.factory/` | Tool names mapped (`Bash`->`Execute`, `Write`->`Create`); namespace prefixes stripped |
 | `pi` | `~/.pi/agent/` | Prompts, skills, extensions, and `mcporter.json` for MCPorter interoperability |
 | `gemini` | `.gemini/` | Skills from agents; commands as `.toml`; namespaced commands become directories (`workflows:plan` -> `commands/workflows/plan.toml`) |
@@ -223,6 +223,8 @@ ccb feat/new-agents --verbose    # extra flags forwarded to claude
 codex-ceb feat/new-agents        # install a pushed branch to Codex
 ```
 
+Codex installs keep generated plugin skills isolated under `~/.codex/<plugin>/skills` and expose them through a symlink at `~/.agents/skills/<plugin>`, which matches Codex native skill discovery while keeping plugin-owned files grouped for cleanup.
+
 ---
 
 ## Sync Personal Config
@@ -293,4 +295,3 @@ Notes:
 - Gemini sync writes MCP config to `~/.gemini/` and avoids mirroring skills that Gemini already discovers from `~/.agents/skills`, which prevents duplicate-skill warnings.
 - Droid, Windsurf, Kiro, and Qwen sync merge MCP servers into the provider's documented user config.
 - OpenClaw currently syncs skills only. Personal command sync is skipped because this repo does not yet have a documented user-level OpenClaw command surface, and MCP sync is skipped because the current official OpenClaw docs do not clearly document an MCP server config contract.
-

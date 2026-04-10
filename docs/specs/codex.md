@@ -50,6 +50,7 @@ https://developers.openai.com/codex/mcp
 - At startup, Codex loads only each skill’s name/description; full content is injected when invoked. citeturn3view3turn3view4
 - Skills can be repo-scoped in `.agents/skills/` and are discovered from the current working directory up to the repository root. User-scoped skills live in `~/.agents/skills/`. citeturn1view1turn1view4
 - Inference: some existing tooling and user setups still use `.codex/skills/` and `~/.codex/skills/` as legacy compatibility paths, but those locations are not documented in the current OpenAI Codex skills docs linked above.
+- Compound Engineering installs generated Codex skills into `~/.codex/<plugin>/skills/` and exposes that directory through `~/.agents/skills/<plugin>` as a symlink. This keeps plugin-owned skills isolated while using Codex's documented user skill discovery root.
 - Codex also supports admin-scoped skills in `/etc/codex/skills` plus built-in system skills bundled with Codex. citeturn1view4
 - Skills can be invoked explicitly using `/skills` or `$skill-name`. citeturn3view3
 

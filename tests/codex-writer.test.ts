@@ -123,6 +123,65 @@ describe("writeCodexBundle", () => {
     expect(await exists(path.join(promptsDir, "ce-plan.md"))).toBe(true)
   })
 
+  test("writes plugin skills under a namespaced Codex store and exposes them through .agents", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-managed-plugin-"))
+    const codexRoot = path.join(tempRoot, ".codex")
+    const bundle: CodexBundle = {
+      pluginName: "compound-engineering",
+      prompts: [{ name: "old-prompt", content: "Prompt content" }],
+      skillDirs: [
+        {
+          name: "skill-one",
+          sourceDir: path.join(import.meta.dir, "fixtures", "sample-plugin", "skills", "skill-one"),
+        },
+      ],
+      generatedSkills: [{ name: "old-agent", content: "Old agent" }],
+    }
+
+    await writeCodexBundle(codexRoot, bundle)
+
+    const managedSkillsRoot = path.join(codexRoot, "compound-engineering", "skills")
+    const symlinkPath = path.join(tempRoot, ".agents", "skills", "compound-engineering")
+    expect(await exists(path.join(managedSkillsRoot, "skill-one", "SKILL.md"))).toBe(true)
+    expect(await exists(path.join(managedSkillsRoot, "old-agent", "SKILL.md"))).toBe(true)
+    expect((await fs.lstat(symlinkPath)).isSymbolicLink()).toBe(true)
+    expect(await fs.realpath(symlinkPath)).toBe(await fs.realpath(managedSkillsRoot))
+    expect(await exists(path.join(codexRoot, "compound-engineering", "install-manifest.json"))).toBe(true)
+
+    await writeCodexBundle(codexRoot, {
+      pluginName: "compound-engineering",
+      prompts: [{ name: "new-prompt", content: "Prompt content" }],
+      skillDirs: [],
+      generatedSkills: [{ name: "new-agent", content: "New agent" }],
+    })
+
+    expect(await exists(path.join(managedSkillsRoot, "skill-one", "SKILL.md"))).toBe(false)
+    expect(await exists(path.join(managedSkillsRoot, "old-agent", "SKILL.md"))).toBe(false)
+    expect(await exists(path.join(managedSkillsRoot, "new-agent", "SKILL.md"))).toBe(true)
+    expect(await exists(path.join(codexRoot, "prompts", "old-prompt.md"))).toBe(false)
+    expect(await exists(path.join(codexRoot, "prompts", "new-prompt.md"))).toBe(true)
+  })
+
+  test("moves known removed flat Codex skill artifacts to a legacy backup", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-legacy-skill-"))
+    const codexRoot = path.join(tempRoot, ".codex")
+    await fs.mkdir(path.join(codexRoot, "skills", "reproduce-bug"), { recursive: true })
+    await fs.writeFile(path.join(codexRoot, "skills", "reproduce-bug", "SKILL.md"), "legacy skill")
+    await fs.mkdir(path.join(codexRoot, "prompts"), { recursive: true })
+    await fs.writeFile(path.join(codexRoot, "prompts", "reproduce-bug.md"), "legacy prompt")
+
+    await writeCodexBundle(codexRoot, {
+      pluginName: "compound-engineering",
+      prompts: [],
+      skillDirs: [],
+      generatedSkills: [{ name: "ce-debug", content: "Debug skill" }],
+    })
+
+    expect(await exists(path.join(codexRoot, "skills", "reproduce-bug"))).toBe(false)
+    expect(await exists(path.join(codexRoot, "prompts", "reproduce-bug.md"))).toBe(false)
+    expect(await exists(path.join(codexRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
   test("preserves existing user config when writing MCP servers", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-backup-"))
     const codexRoot = path.join(tempRoot, ".codex")
