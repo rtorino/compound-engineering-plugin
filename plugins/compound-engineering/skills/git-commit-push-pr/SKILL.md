@@ -232,11 +232,11 @@ When evidence is possible, ask whether to include it in the PR description. Use 
 **Question:** "This PR has observable behavior. Capture evidence for the PR description?"
 
 **Options:**
-1. **Capture evidence now** -- load the `demo-reel` skill with a concise target inferred from the diff, then include its returned embed in the PR body
+1. **Capture evidence now** -- load the `ce-demo-reel` skill with a concise target inferred from the diff, then include its returned embed in the PR body
 2. **Use existing evidence** -- ask the user for the URL or markdown embed, then include it in the PR body
 3. **Skip evidence** -- write the PR description without an evidence section
 
-If the user chooses capture and `demo-reel` returns skipped, failed, or empty output, do not add a placeholder section. Summarize the reason in the final user report.
+If the user chooses capture and `ce-demo-reel` returns skipped, failed, or empty output, do not add a placeholder section. Summarize the reason in the final user report.
 
 Place returned evidence markdown before the Compound Engineering badge and near the part of the description it supports, typically after the summary or testing notes. Do not label test output as "Demo" or "Screenshots".
 

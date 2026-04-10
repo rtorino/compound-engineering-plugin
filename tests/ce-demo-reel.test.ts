@@ -8,7 +8,7 @@ const SCRIPT = path.join(
   "plugins",
   "compound-engineering",
   "skills",
-  "demo-reel",
+  "ce-demo-reel",
   "scripts",
   "capture-demo.py",
 )

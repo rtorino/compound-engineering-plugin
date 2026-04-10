@@ -69,7 +69,7 @@ def cmd_preflight(_args):
 # --- Detect ---
 
 ELECTRON_DEPS = {"electron", "electron-builder", "electron-forge", "electron-vite", "electron-packager"}
-WEB_NODE_DEPS = {"react", "vue", "svelte", "astro", "next", "nuxt", "angular", "solid-js", "remix", "gatsby"}
+WEB_NODE_DEPS = {"react", "vue", "svelte", "astro", "next", "nuxt", "@angular/core", "solid-js", "remix", "gatsby"}
 WEB_RUBY_DEPS = {"rails", "sinatra", "hanami", "roda"}
 WEB_GO_DEPS = {"gin", "echo", "fiber", "chi", "gorilla/mux"}
 WEB_PYTHON_DEPS = {"flask", "django", "fastapi", "starlette", "tornado"}
@@ -515,12 +515,19 @@ def cmd_upload(args):
     size_mb = file_size_mb(file_path)
     print(f"Uploading {file_path} ({size_mb:.1f} MB) to catbox.moe...")
 
-    result = subprocess.run(
-        ["curl", "-s", "-F", "reqtype=fileupload",
-         "-F", f"fileToUpload=@{file_path}", CATBOX_API],
-        capture_output=True, text=True, timeout=120, check=False,
-    )
-    url = result.stdout.strip()
+    def _try_upload():
+        try:
+            result = subprocess.run(
+                ["curl", "-s", "-F", "reqtype=fileupload",
+                 "-F", f"fileToUpload=@{file_path}", CATBOX_API],
+                capture_output=True, text=True, timeout=120, check=False,
+            )
+            return result.stdout.strip()
+        except subprocess.TimeoutExpired:
+            print("ERROR: Upload timed out after 120s", file=sys.stderr)
+            return ""
+
+    url = _try_upload()
 
     if url.startswith("https://"):
         print(f"Uploaded: {url}")
@@ -533,12 +540,7 @@ def cmd_upload(args):
     # Retry once
     print("Retrying in 5 seconds...", file=sys.stderr)
     time.sleep(5)
-    result = subprocess.run(
-        ["curl", "-s", "-F", "reqtype=fileupload",
-         "-F", f"fileToUpload=@{file_path}", CATBOX_API],
-        capture_output=True, text=True, timeout=120, check=False,
-    )
-    url = result.stdout.strip()
+    url = _try_upload()
 
     if url.startswith("https://"):
         print(f"Uploaded (retry): {url}")
