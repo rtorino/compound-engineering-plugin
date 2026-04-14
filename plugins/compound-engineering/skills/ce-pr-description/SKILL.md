@@ -1,7 +1,7 @@
 ---
 name: ce-pr-description
-description: "Write or regenerate a value-first pull-request description (title + body) from an existing PR or a diff range. Use when the user says 'write a PR description', 'refresh the PR description', 'regenerate the PR body', 'rewrite this PR', 'freshen the PR', 'update the PR description', 'draft a PR body for this diff', 'describe this PR properly', 'generate the PR title', or wants a well-framed PR description without the full commit-and-push ceremony. Also used internally by git-commit-push-pr (single-PR flow) and ce-pr-stack (per-layer stack descriptions) so all callers share one writing voice. Accepts pr:<number> (existing open PR) or range:<base>..<head> (pre-PR or dry-run), plus an optional focus:<hint>. Returns structured {title, body} for the caller to apply via gh pr edit or gh pr create — this skill never edits the PR itself and never prompts for confirmation."
-argument-hint: "[pr:<number> | range:<base>..<head>] [focus:<hint>] — pr: reads an existing open PR, range: works from any diff (fork PRs and non-local base refs handled automatically), focus: optional steering hint"
+description: "Write or regenerate a value-first pull-request description (title + body) from an existing PR or a diff range. Use when the user says 'write a PR description', 'refresh the PR description', 'regenerate the PR body', 'rewrite this PR', 'freshen the PR', 'update the PR description', 'draft a PR body for this diff', 'describe this PR properly', 'generate the PR title', or pastes a GitHub PR URL and asks to rewrite or refresh its description. Also used internally by git-commit-push-pr (single-PR flow) and ce-pr-stack (per-layer stack descriptions) so all callers share one writing voice. Accepts pr:<number-or-url> (existing open PR — bare number, full https://github.com/.../pull/NN URL, or owner/repo#NN shorthand), range:<base>..<head> (pre-PR or dry-run), plus an optional focus:<hint>. Returns structured {title, body} for the caller to apply via gh pr edit or gh pr create — this skill never edits the PR itself and never prompts for confirmation."
+argument-hint: "[pr:<number-or-url> | range:<base>..<head>] [focus:<hint>] — pr: accepts a bare number, a full https://github.com/.../pull/NN URL, or owner/repo#NN shorthand; range: works from any diff (fork PRs and non-local base refs handled automatically); focus: optional steering hint"
 ---
 
 # CE PR Description
@@ -18,7 +18,12 @@ Why a separate skill: several callers need the same writing logic without the si
 
 Callers pass one of the two input forms below, plus an optional focus hint. If invoked directly by the user with no explicit form, infer from context (an existing open PR on the current branch -> `pr:<number>`; a branch with no PR yet -> `range:<base>..HEAD`).
 
-- **`pr: <number>`** -- generate description for an existing PR. The skill reads title, body, and commit list via `gh pr view`, and derives the diff from the PR's commit range.
+- **`pr: <number-or-url>`** -- generate description for an existing PR. Accepts three forms:
+  - Bare number: `pr: 561` -- resolves against the current repo
+  - Full URL: `pr: https://github.com/owner/repo/pull/561` -- works from any directory, even outside a local clone of the target repo
+  - Shorthand: `pr: owner/repo#561` -- works anywhere
+
+  The skill reads title, body, and commit list via `gh pr view <number-or-url>` (which accepts all three forms natively), and derives the diff from the PR's commit range. When the URL points to a repo other than the current working directory's repo, the skill fetches the PR head from the URL-derived remote; if that is not possible (no local clone of that repo), it falls back to reading the diff directly via `gh pr diff <number-or-url>` and skips the local-git steps.
 - **`range: <base>..<head>`** -- generate description for an arbitrary range without requiring an existing PR. Useful before a PR is created, or as a dry-run for a branch being prepared for stack submission.
 - **`focus: <hint>`** (optional) -- a user-provided steering note such as "include the benchmarking results" or "emphasize the migration safety story". Incorporate alongside the diff-derived narrative; do not let focus override the value-first principles.
 
@@ -46,31 +51,32 @@ Interactive scaffolding (confirmation prompts, compare-and-confirm, apply step) 
 
 ## Step 1: Resolve the diff and commit list
 
-### If input is `pr: <number>`
+### If input is `pr: <number-or-url>`
 
-Fetch PR metadata and commit list:
+All three input forms (bare number, full URL, `owner/repo#number` shorthand) work identically with `gh pr view` — pass the caller's value through verbatim as `<pr-ref>`:
 
 ```bash
-gh pr view <number> --json number,state,title,body,baseRefName,headRefName,headRepositoryOwner,headRepository,commits,url
+gh pr view <pr-ref> --json number,state,title,body,baseRefName,headRefName,headRepositoryOwner,headRepository,baseRepository,commits,url
 ```
+
+Extract the PR number, base-repo owner, and base-repo name from the JSON output. The PR number is needed for the `refs/pull/<N>/head` fetch; the base-repo identity determines whether the target repo matches the current working directory.
 
 If the returned `state` is not `OPEN`, report "PR <number> is <state> (not open); cannot regenerate description" and exit gracefully without output. Callers expecting `{title, body}` must handle this empty case.
 
-Resolve the base remote from the PR metadata (the base repository's remote in the local clone — fall back to `origin` when ambiguous). Do not assume a local branch matching `headRefName` exists: the PR may come from a fork, the local branch may have been deleted, the clone may not have fetched it, or the user may be running the skill from a different branch. Resolve the PR's head commit via the **`refs/pull/<number>/head`** ref, which GitHub makes available on every PR regardless of source repository.
+**Determine whether the PR lives in the current repo** by comparing the PR's base-repo (owner + name) against the local clone's remote URL. Use `git remote get-url origin` and check whether the URL points to `<baseRepositoryOwner>/<baseRepository>`. Two cases:
+
+**Case A — PR is in the current repo** (common case when the user is working inside the target repo):
+
+Resolve the base remote (the one whose URL points to the PR's base repository; fall back to `origin`). Do not assume a local branch matching `headRefName` exists: the PR may come from a fork, the local branch may have been deleted, the clone may not have fetched it, or the user may be running the skill from a different branch. Resolve the PR's head commit via the **`refs/pull/<number>/head`** ref, which GitHub makes available on every PR regardless of source repository.
 
 Fetch both the base ref (in case it isn't local yet) and the PR head ref in one step:
 
 ```bash
 git fetch --no-tags <base-remote> <baseRefName> "refs/pull/<number>/head"
-```
-
-The PR head SHA is then available as `FETCH_HEAD`. Capture it into a variable before running any subsequent git commands so later invocations of `git fetch` do not overwrite it:
-
-```bash
 PR_HEAD_SHA=$(git rev-parse FETCH_HEAD)
 ```
 
-Alternative path when `refs/pull/<number>/head` is unavailable (some ghes configurations or non-GitHub remotes): read the last commit SHA from the `commits` array returned by `gh pr view`'s `--json commits` output and use that SHA directly — no fetch needed because `gh` surfaces the SHA from the API even when the commit isn't local. Note that subsequent `git merge-base`/`git log`/`git diff` calls then require the commit to be fetched: `git fetch --no-tags <base-remote> <PR_HEAD_SHA>` is idempotent when the commit is already local.
+Capture `PR_HEAD_SHA` immediately so subsequent fetches do not overwrite `FETCH_HEAD`.
 
 Gather merge base, commit list, and full diff using the resolved SHA (not `headRefName`):
 
@@ -78,7 +84,20 @@ Gather merge base, commit list, and full diff using the resolved SHA (not `headR
 MERGE_BASE=$(git merge-base <base-remote>/<baseRefName> $PR_HEAD_SHA) && echo "MERGE_BASE=$MERGE_BASE" && echo '=== COMMITS ===' && git log --oneline $MERGE_BASE..$PR_HEAD_SHA && echo '=== DIFF ===' && git diff $MERGE_BASE...$PR_HEAD_SHA
 ```
 
-Also capture the existing PR body for evidence preservation in Step 3.
+**Case B — PR is in a different repo** (user pasted a URL to a repo not present locally):
+
+Skip the local-git path entirely. Read the diff directly via `gh`, which hits the GitHub API:
+
+```bash
+gh pr diff <pr-ref>
+gh pr view <pr-ref> --json commits --jq '.commits[] | [.oid[0:7], .messageHeadline] | @tsv'
+```
+
+This gives an equivalent diff and commit list without requiring the base or head refs to be local. The rest of the pipeline (classification, framing, writing) proceeds unchanged. Note in the returned body or a short caller-facing note when this fallback was used — it signals that evidence preservation (Step 3) relied on the PR body as fetched from the API rather than on any local working-tree state.
+
+**Alternative path when `refs/pull/<number>/head` is unavailable** (some ghes configurations or non-GitHub remotes): read the last commit SHA from the `commits` array returned by `gh pr view`'s `--json commits` output and use that SHA directly — no named ref needed because `gh` surfaces the SHA from the API even when the commit isn't local. Subsequent `git` calls then require the commit to be fetched: `git fetch --no-tags <base-remote> <PR_HEAD_SHA>` is idempotent when the commit is already local.
+
+Also capture the existing PR body for evidence preservation in Step 3 (both cases).
 
 ### If input is `range: <base>..<head>`
 
