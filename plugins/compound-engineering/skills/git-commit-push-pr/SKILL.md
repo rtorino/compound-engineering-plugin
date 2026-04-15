@@ -201,8 +201,8 @@ When evidence is not possible (docs-only, markdown-only, changelog-only, release
 
 **Delegate title and body generation to `ce-pr-description`.** Load the `ce-pr-description` skill:
 
-- **For a new PR** (no existing PR found in Step 3): invoke with no PR reference. `ce-pr-description`'s current-branch mode auto-detects `origin/HEAD` (or an existing PR's base, if one somehow appears between Step 3 and now) and describes the commits on HEAD. Any captured-evidence context or user focus is passed as free-text steering (e.g., "include the captured demo: <URL> as a `## Demo` section").
-- **For an existing PR** (found in Step 3): invoke with the full PR URL from the Step 3 context (e.g., `https://github.com/owner/repo/pull/123`). The URL preserves repo/PR identity even when invoked from a worktree or subdirectory. Append any focus steering as free text after the URL.
+- **For a new PR** (no existing PR found in Step 3): invoke with `base:<base-remote>/<base-branch>` using the already-resolved base from earlier in this step, so `ce-pr-description` describes the correct commit range even when the branch targets a non-default base (e.g., `develop`, `release/*`). Append any captured-evidence context or user focus as free-text steering (e.g., "include the captured demo: <URL> as a `## Demo` section").
+- **For an existing PR** (found in Step 3): invoke with the full PR URL from the Step 3 context (e.g., `https://github.com/owner/repo/pull/123`). The URL preserves repo/PR identity even when invoked from a worktree or subdirectory; the skill reads the PR's own `baseRefName` so no `base:` override is needed. Append any focus steering as free text after the URL.
 
 `ce-pr-description` returns a `{title, body}` block. It applies the value-first writing principles, commit classification, sizing, narrative framing, writing voice, visual communication, numbering rules, and the Compound Engineering badge footer internally. Use the returned values verbatim in Step 7; do not layer manual edits onto them unless a focused adjustment is required (e.g., splicing an evidence block captured in this step that was not passed as steering text).
 

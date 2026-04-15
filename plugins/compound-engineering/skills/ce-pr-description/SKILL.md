@@ -32,10 +32,14 @@ No specific grammar is required — read the argument as natural language and id
 
 Steering text is always optional. If present, incorporate it alongside the diff-derived narrative; do not let it override the value-first principles or fabricate content unsupported by the diff.
 
+**Optional `base:<ref>` override (current-branch mode only).** When a caller already knows the intended base branch (e.g., `git-commit-push-pr` has detected `origin/develop` or `origin/release/2026-04` as the target), it can pass `base:<ref>` to pin the base explicitly. The ref must resolve locally. This overrides auto-detection for current-branch mode; PR mode ignores it (PRs already define their own base via `baseRefName`). Most invocations don't need this — auto-detection (existing PR's `baseRefName` → `origin/HEAD`) covers the common case.
+
 **Examples**:
 
-- `ce-pr-description` → current-branch, no focus
+- `ce-pr-description` → current-branch, no focus, auto-detect base
 - `ce-pr-description emphasize the benchmarks` → current-branch, focus = "emphasize the benchmarks"
+- `ce-pr-description base:origin/develop` → current-branch, base pinned to `origin/develop`
+- `ce-pr-description base:origin/develop emphasize perf` → same + focus
 - `ce-pr-description pr:561` → PR #561, no focus
 - `ce-pr-description #561 do a good job with the perf story` → PR #561, focus = "do a good job with the perf story"
 - `ce-pr-description https://github.com/foo/bar/pull/561 emphasize safety` → PR #561 in foo/bar, focus = "emphasize safety"
@@ -68,10 +72,11 @@ Parse the input (see Inputs above) and branch on which mode it selects.
 
 ### Current-branch mode (default when no PR reference was given)
 
-Determine the base against which to compare:
+Determine the base against which to compare, in this priority order:
 
-1. Check whether the current branch already has an open PR on this repo. If yes, use that PR's `baseRefName` as the base — this handles the case of a feature branch targeting a non-default base (e.g., `develop`).
-2. Otherwise fall back to the repo's default base (`origin/HEAD`).
+1. **Caller-supplied `base:<ref>`** — if present, use it verbatim. The caller is asserting the correct base. The ref must resolve locally.
+2. **Existing PR's `baseRefName`** — if the current branch already has an open PR on this repo, use that PR's base. Handles feature branches targeting non-default bases (e.g., `develop`) when the PR is already open.
+3. **Repo default (`origin/HEAD`)** — fall back for branches with no PR yet and no caller-supplied base.
 
 ```bash
 # Detect current branch (fail if detached HEAD)
@@ -81,14 +86,17 @@ if [ -z "$CURRENT_BRANCH" ]; then
   exit 1
 fi
 
-# Prefer an existing PR's base, fall back to origin/HEAD
-EXISTING_PR_BASE=$(gh pr view --json baseRefName --jq '.baseRefName' 2>/dev/null)
-if [ -n "$EXISTING_PR_BASE" ]; then
-  BASE_REF="origin/$EXISTING_PR_BASE"
+# Priority: caller-supplied base: > existing PR's baseRefName > origin/HEAD
+if [ -n "$CALLER_BASE" ]; then
+  BASE_REF="$CALLER_BASE"
 else
-  # Default base from origin/HEAD (the repo's default branch)
-  BASE_REF=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null)
-  BASE_REF="${BASE_REF:-origin/main}"
+  EXISTING_PR_BASE=$(gh pr view --json baseRefName --jq '.baseRefName' 2>/dev/null)
+  if [ -n "$EXISTING_PR_BASE" ]; then
+    BASE_REF="origin/$EXISTING_PR_BASE"
+  else
+    BASE_REF=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null)
+    BASE_REF="${BASE_REF:-origin/main}"
+  fi
 fi
 ```
 
