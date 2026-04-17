@@ -205,7 +205,7 @@ The sync confirmation happens in Phase 5 regardless of whether threads are open 
 
 Runs when the user selects **Proceed**. Before prompting anything, check whether the Proof content actually diverged from what was uploaded — if not, there's nothing to sync and no reason to ask.
 
-1. Fetch current state: `GET /api/agent/{slug}/state` with `x-share-token: <token>`. Capture `state.markdown` and `state.revision`.
+1. Fetch current state: `GET /api/agent/{slug}/state` with `x-share-token: <token>`. Save the full response body to a temp file (`$STATE_TMP`) so the markdown bytes can later be streamed to disk without passing through `$(...)` (which would strip trailing newlines). Extract `state.revision` from that file into `$REVISION`. Read `state.markdown` from that file for the comparison in step 2.
 
 2. Compare `state.markdown` to `uploadedMarkdown` (captured in Phase 1).
 
@@ -233,13 +233,15 @@ Runs when the user selects **Proceed**. Before prompting anything, check whether
 4. On **Yes, sync now**, write the fetched markdown to local — see `Workflow: Pull a Proof Doc to Local` in `SKILL.md`:
 
    ```bash
+   # $STATE_TMP is the temp file holding the /state response from step 1.
    TMP="${SOURCE}.proof-sync.$$"
-   printf '%s' "$MARKDOWN" > "$TMP" && mv "$TMP" "$SOURCE"
+   jq -jr '.markdown' "$STATE_TMP" > "$TMP" && mv "$TMP" "$SOURCE"
+   rm "$STATE_TMP"
    ```
 
-   (The `$MARKDOWN` and `$REVISION` values come from the state fetch in step 1 — no need to re-fetch.)
+   Stream `.markdown` bytes directly from the saved state file with `jq -jr` — do not capture the markdown into a shell variable, since `$(...)` would strip trailing newlines and corrupt the write. `$REVISION` (extracted separately in step 1) is safe to keep as a variable; it's an opaque scalar.
 
-   On **Not yet**, skip the write.
+   On **Not yet**, skip the write (still clean up `$STATE_TMP`).
 
 5. Set presence `status: completed`, summary `"Review synced to <localPath>"` (or `"Review complete, local not updated"` if sync was declined) so the Proof UI shows the loop has finished.
 

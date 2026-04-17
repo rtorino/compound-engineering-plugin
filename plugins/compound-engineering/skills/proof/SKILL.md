@@ -266,18 +266,19 @@ SLUG=<slug>
 TOKEN=<accessToken>
 LOCAL=<absolute-path>
 
-# One read, two extractions
-STATE=$(curl -s "https://www.proofeditor.ai/api/agent/$SLUG/state" \
-  -H "x-share-token: $TOKEN")
-MARKDOWN=$(echo "$STATE" | jq -r '.markdown')
-REVISION=$(echo "$STATE" | jq -r '.revision')
+# One read to a temp file — avoids passing markdown through $(...), which would strip trailing newlines.
+STATE_TMP=$(mktemp)
+curl -s "https://www.proofeditor.ai/api/agent/$SLUG/state" \
+  -H "x-share-token: $TOKEN" > "$STATE_TMP"
+REVISION=$(jq -r '.revision' "$STATE_TMP")
 
-# Atomic write: temp-then-rename preserves the original on crash
+# Atomic write: stream .markdown bytes directly to a temp sibling, then rename.
 TMP="${LOCAL}.proof-sync.$$"
-printf '%s' "$MARKDOWN" > "$TMP" && mv "$TMP" "$LOCAL"
+jq -jr '.markdown' "$STATE_TMP" > "$TMP" && mv "$TMP" "$LOCAL"
+rm "$STATE_TMP"
 ```
 
-Use `printf` instead of `echo` so trailing-newline state is preserved byte-for-byte. `mv` within the same filesystem is atomic — a crashed write leaves the original untouched rather than a half-written file.
+`jq -jr` (`-j` no trailing newline, `-r` raw string) streams the markdown bytes straight to the temp file without going through a shell variable, so trailing newlines survive intact. `mv` within the same filesystem is atomic — a crashed write leaves the original untouched rather than a half-written file.
 
 **Confirm before writing when the pull isn't directly asked for.** If a workflow ends up pulling as a side-effect of a different action (e.g., HITL review completion), surface the impending write with a short confirm like "Sync reviewed doc to `<localPath>`?" A silent overwrite is surprising — the user may have forgotten the local file exists in that session, or expected Proof to stay canonical until they explicitly asked to pull.
 
