@@ -121,15 +121,17 @@ The Proof failure ladder in Phase 6.5 governs what happens when this hand-off fa
 
 **Caller-aware return.** The return-rule bullets below describe the default control flow, but the next step depends on which Phase 6 option invoked the Proof save. Apply the right branch for the caller:
 
-- **§6.2 Open and iterate in Proof.** Follow the bullets as written and return to the Phase 6 menu on every status — this option is explicitly about iterating on the Proof surface, so returning to the menu lets the user pick a follow-up action (brainstorm, save and end, or keep refining) after the review loop.
+- **§6.2 Open and iterate in Proof.** Behavior is mode-aware:
+    - *Repo mode:* return to the Phase 6 menu on every status. The Proof-reviewed content is now synced locally, and the user typically has a follow-up action in the repo (brainstorm toward a plan, save and end, or keep refining).
+    - *Elsewhere mode:* on a successful Proof return (`proceeded` or `done_for_now`), exit cleanly — narrate that the artifact lives at `docUrl` (including any stale-local note if applicable) and stop. Proof iteration is often the terminal act in elsewhere mode; forcing another menu choice after the user already got what they came for produces decision fatigue. Only the `aborted` branch returns to the Phase 6 menu so the user can retry or pick another path.
 - **§6.3 Brainstorm a selected idea.** On a successful Proof return (`proceeded` or `done_for_now`), do **not** stop at the Phase 6 menu — after applying the per-status handling below (including any stale-local pull offer), continue into §6.3's remaining bullets (mark the chosen idea as `Explored`, then load `ce:brainstorm`). Only the `aborted` branch returns to the Phase 6 menu, since no durable record was written.
 - **§6.4 Save and end.** On a successful Proof return (`proceeded` or `done_for_now`), exit cleanly: narrate that the ideation was saved, surface the `docUrl` (and the local-path note if applicable), and stop. Do **not** re-ask the Phase 6 question — the user already chose to end. Only the `aborted` branch returns to the Phase 6 menu so the user can retry or pick a different path.
 
 When the proof skill returns control:
 
-- `status: proceeded` with `localSynced: true` → the ideation doc on disk now reflects the review. Follow the caller-aware return rule above (return to menu for §6.2 / continue §6.3 / exit §6.4).
-- `status: proceeded` with `localSynced: false` → the reviewed version lives in Proof at `docUrl` but the local copy is stale. Offer to pull the Proof doc to `localPath` using the proof skill's Pull workflow. Follow the caller-aware return rule above; if the pull was declined, include a one-line note that `<localPath>` is stale vs. Proof so the next handoff (or the final §6.4 narration) doesn't read the old content silently. Placement: above the Phase 6 menu for the §6.2 caller, in the handoff preamble to `ce:brainstorm` for §6.3, or alongside the final save narration for §6.4.
-- `status: done_for_now` → the doc on disk may be stale if the user edited in Proof before leaving. Offer to pull the Proof doc to `localPath` so the local ideation artifact stays in sync, then follow the caller-aware return rule above. `done_for_now` means the user stopped the HITL loop — it does not mean they ended the whole ideation session (except when §6.4 was the caller, in which case their Phase 6 choice to end still stands). If the pull was declined, include the stale-local note at the placement described in the previous bullet.
+- `status: proceeded` with `localSynced: true` → the ideation doc on disk now reflects the review. Apply the caller-aware return rule above for the invoking branch.
+- `status: proceeded` with `localSynced: false` → the reviewed version lives in Proof at `docUrl` but the local copy is stale. Offer to pull the Proof doc to `localPath` using the proof skill's Pull workflow. Apply the caller-aware return rule above; if the pull was declined, include a one-line note that `<localPath>` is stale vs. Proof so the next handoff (or final exit narration) doesn't read the old content silently. Placement: above the Phase 6 menu when the caller-aware rule returns to it, in the handoff preamble to `ce:brainstorm` for §6.3, or alongside the final save/exit narration for §6.2 elsewhere / §6.4.
+- `status: done_for_now` → the doc on disk may be stale if the user edited in Proof before leaving. Offer to pull the Proof doc to `localPath` so the local ideation artifact stays in sync, then apply the caller-aware return rule above. `done_for_now` means the user stopped the HITL loop — it does not mean they ended the whole ideation session unless the caller-aware rule exits (§6.2 elsewhere mode or §6.4). If the pull was declined, include the stale-local note at the placement described in the previous bullet.
 - `status: aborted` → fall back to the Phase 6 menu without changes, regardless of caller. No durable record was written, so §6.3 must not proceed with the brainstorm handoff and §6.4 must not end — the menu lets the user retry or pick another path.
 
 ## Phase 6: Refine or Hand Off
@@ -161,7 +163,7 @@ No persistence triggers during refinement. The user can choose Save and end (or 
 
 Invoke the Proof HITL review path via §5.2 with §6.2 as the caller. In repo mode, ensure the local file exists first (run §5.1) so the HITL sync-back has a target; in elsewhere mode, §5.2 renders to a temp file as usual. Honor Phase 5's "ensure a record exists first" contract either way.
 
-Apply §5.2's caller-aware return rule for the §6.2 branch: return to the Phase 6 menu on every status (success or `aborted`). This option is explicitly about iterating, so the user expects to pick a follow-up action afterward (brainstorm the refined survivors, save and end, or keep refining in conversation).
+Apply §5.2's caller-aware return rule for the §6.2 branch — behavior is mode-aware. In repo mode, return to the Phase 6 menu on every status so the user can pick a follow-up (brainstorm toward a plan, save-and-end, or keep refining) now that the Proof review is reflected in the local file. In elsewhere mode, exit cleanly on a successful Proof return since Proof iteration is often the terminal act — the artifact lives at `docUrl` and is the canonical record; only the `aborted` status returns to the menu.
 
 If the Proof handoff fails, the §6.5 Proof Failure Ladder governs recovery.
 
@@ -171,7 +173,7 @@ If the Proof handoff fails, the §6.5 Proof Failure Ladder governs recovery.
 - Mark the chosen idea as `Explored` in the saved record
 - Load the `ce:brainstorm` skill with the chosen idea as the seed
 
-Do **not** skip brainstorming and go straight to planning from ideation output.
+**Repo mode only:** do **not** skip brainstorming and go straight to `ce:plan` from ideation output — `ce:plan` wants brainstorm-grounded requirements. In elsewhere modes, ideation (or ideation + Proof iteration) is a legitimate terminal state; brainstorming is optional deeper development of one idea, not a required next rung on an implementation ladder that does not exist in these modes.
 
 ### 6.4 Save and End
 
