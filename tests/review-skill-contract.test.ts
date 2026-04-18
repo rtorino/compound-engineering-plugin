@@ -72,18 +72,60 @@ describe("ce-review contract", () => {
   test("documents policy-driven routing and residual handoff", async () => {
     const content = await readRepoFile("plugins/compound-engineering/skills/ce-review/SKILL.md")
 
+    // Routing taxonomy and fixer queue semantics
     expect(content).toContain("## Action Routing")
     expect(content).toContain("Only `safe_auto -> review-fixer` enters the in-skill fixer queue automatically.")
-    expect(content).toContain(
-      "Only include `gated_auto` findings in the fixer queue after the user explicitly approves the specific items.",
-    )
-    expect(content).toContain(
-      "If no `gated_auto` or `manual` findings remain after safe fixes, skip the policy question entirely",
-    )
+
+    // Interactive mode four-option routing structure: each distinguishing word must appear
+    // as a routing-option label so truncation-safe menus stay intact.
+    // Assert presence rather than exact copy — wording can be improved without breaking the test.
+    expect(content).toMatch(/\(A\)\s*`Review each finding one by one/)
+    expect(content).toMatch(/\(B\)\s*`LFG\./)
+    expect(content).toMatch(/\(C\)\s*`File a \[TRACKER\] ticket/)
+    expect(content).toMatch(/\(D\)\s*`Report only/)
+
+    // The new routing question dispatches to focused reference files, not inline prose.
+    expect(content).toContain("references/walkthrough.md")
+    expect(content).toContain("references/bulk-preview.md")
+    expect(content).toContain("references/tracker-defer.md")
+
+    // Stem is third-person (AGENTS.md:127 — no first-person "I" / "me" in the new routing question).
+    // The Interactive branch of After Review Step 2 must not reintroduce the removed bucket-policy wording.
+    expect(content).not.toContain("What should I do with the remaining findings?")
+    expect(content).not.toContain("What should I do?")
+
+    // Zero-remaining case: routing question is skipped with a completion summary.
+    expect(content).toMatch(/skip the routing question entirely/i)
+
+    // Stage 5 tie-breaking rule — the walk-through's recommendation is deterministic.
+    expect(content).toMatch(/Skip\s*>\s*Defer\s*>\s*Apply/)
+
+    // Autofix-mode residual todo handoff is preserved (mode isolation).
     expect(content).toContain(
       "In autofix mode, create durable todo files only for unresolved actionable findings whose final owner is `downstream-resolver`.",
     )
     expect(content).toContain("If only advisory outputs remain, create no todos.")
+
+    // Tracker fallback chain explicitly forbids extending the internal todos system.
+    const trackerDefer = await readRepoFile(
+      "plugins/compound-engineering/skills/ce-review/references/tracker-defer.md",
+    )
+    expect(trackerDefer).toContain(".context/compound-engineering/todos/")
+    expect(trackerDefer).toMatch(/Never fall back to `\.context\/compound-engineering\/todos\//)
+
+    // Subagent template carries the why_it_matters framing guidance that replaces the
+    // rejected synthesis-time rewrite pass. Assert presence of the observable-behavior
+    // rule and the required-field reminder without pinning exact prose.
+    const subagentTemplate = await readRepoFile(
+      "plugins/compound-engineering/skills/ce-review/references/subagent-template.md",
+    )
+    expect(subagentTemplate).toMatch(/observable behavior/i)
+    expect(subagentTemplate).toMatch(/required/i)
+
+    // Step 5 final-next-steps flow is gated on fixes-applied.
+    expect(content).toMatch(/only when one or more fixes landed/i)
+
+    // Final-next-steps wording preserved.
     expect(content).toContain("**On the resolved review base/default branch:**")
     expect(content).toContain("git push --set-upstream origin HEAD")
     expect(content).not.toContain("**On main/master:**")
