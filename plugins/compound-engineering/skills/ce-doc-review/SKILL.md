@@ -6,28 +6,34 @@ argument-hint: "[mode:headless] [path/to/document.md]"
 
 # Document Review
 
-Review requirements or plan documents through multi-persona analysis. Dispatches specialized reviewer agents in parallel, auto-fixes quality issues, and presents strategic questions for user decision.
+Review requirements or plan documents through multi-persona analysis. Dispatches specialized reviewer agents in parallel, auto-applies `safe_auto` fixes, and routes remaining findings through a four-option interaction (per-finding walk-through, LFG, Append-to-Open-Questions, Report-only) for user decision.
+
+## Interactive mode rules
+
+- **Pre-load the platform question tool before any question fires.** In Claude Code, `AskUserQuestion` is a deferred tool — its schema is not available at session start. At the start of Interactive-mode work (before the routing question, per-finding walk-through questions, bulk-preview Proceed/Cancel, and Phase 5 terminal question), call `ToolSearch` with query `select:AskUserQuestion` to load the schema. Load it once, eagerly, at the top of the Interactive flow — do not wait for the first question site. On Codex (`request_user_input`) and Gemini (`ask_user`) this step is not required; the tools are loaded by default.
+- **The numbered-list fallback only applies on confirmed load failure.** Presenting options as a numbered list and waiting for the user's reply is valid only when `ToolSearch` returns no match or the tool call explicitly fails. Rendering a question as narrative text because the tool feels inconvenient, because the model is in report-formatting mode, or because the instruction was buried in a long skill is a bug. A question that calls for a user decision must either fire the tool or fail loudly.
 
 ## Phase 0: Detect Mode
 
-Check the skill arguments for `mode:headless`. Arguments may contain a document path, `mode:headless`, or both. Tokens starting with `mode:` are flags, not file paths -- strip them from the arguments and use the remaining token (if any) as the document path for Phase 1.
+Check the skill arguments for `mode:headless`. Arguments may contain a document path, `mode:headless`, or both. Tokens starting with `mode:` are flags, not file paths — strip them from the arguments and use the remaining token (if any) as the document path for Phase 1.
 
 If `mode:headless` is present, set **headless mode** for the rest of the workflow.
 
-**Headless mode** changes the interaction model, not the classification boundaries. Document-review still applies the same judgment about what has one clear correct fix vs. what needs user judgment. The only difference is how non-auto findings are delivered:
-- `auto` fixes are applied silently (same as interactive)
-- `present` findings are returned as structured text for the caller to handle -- no AskUserQuestion prompts, no interactive approval
-- Phase 5 returns immediately with "Review complete" (no refine/complete question)
+**Headless mode** changes the interaction model, not the classification boundaries. ce-doc-review still applies the same judgment about which tier each finding belongs in. The only difference is how non-safe_auto findings are delivered:
+
+- `safe_auto` fixes are applied silently (same as interactive)
+- `gated_auto`, `manual`, and FYI findings are returned as structured text for the caller to handle — no AskUserQuestion prompts, no interactive routing
+- Phase 5 returns immediately with "Review complete" (no routing question, no terminal question)
 
 The caller receives findings with their original classifications intact and decides what to do with them.
 
 Callers invoke headless mode by including `mode:headless` in the skill arguments, e.g.:
+
 ```
 Skill("ce-doc-review", "mode:headless docs/plans/my-plan.md")
 ```
 
-
-If `mode:headless` is not present, the skill runs in its default interactive mode with no behavior change.
+If `mode:headless` is not present, the skill runs in its default interactive mode with the routing question, walk-through, and bulk-preview behaviors documented in `references/walkthrough.md` and `references/bulk-preview.md`.
 
 ## Phase 1: Get and Analyze Document
 
@@ -133,7 +139,9 @@ Pass each agent the **full document** -- do not split into sections.
 
 ## Phases 3-5: Synthesis, Presentation, and Next Action
 
-After all dispatched agents return, read `references/synthesis-and-presentation.md` for the synthesis pipeline (validate, gate, dedup, promote, resolve contradictions, route by autofix class), auto-fix application, finding presentation, and next-action menu. Do not load this file before agent dispatch completes.
+After all dispatched agents return, read `references/synthesis-and-presentation.md` for the synthesis pipeline (validate, per-severity gate, dedup, cross-persona agreement boost, resolve contradictions, auto-promotion, route by three tiers with FYI subsection), `safe_auto` fix application, headless-envelope output, and the handoff to the routing question.
+
+For the four-option routing question and per-finding walk-through (interactive mode), read `references/walkthrough.md`. For the bulk-action preview used by LFG, Append-to-Open-Questions, and walk-through `LFG-the-rest`, read `references/bulk-preview.md`. Do not load these files before agent dispatch completes.
 
 ---
 
