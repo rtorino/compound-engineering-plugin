@@ -11,9 +11,9 @@ This document records the intended install model by harness. The current priorit
 | Claude Code | Native plugin marketplace using existing `.claude-plugin/marketplace.json` and `plugins/compound-engineering/.claude-plugin/plugin.json` | No | Only for old/manual non-native installs, if any | Current repo shape already satisfies Claude Code. |
 | GitHub Copilot CLI | Native plugin marketplace using the same existing `.claude-plugin` metadata | No, CE plugin install/convert target removed | Yes, before or during migration from previous `.github/` custom installs | Tested manually: Copilot can install from the existing CE marketplace and load agents. |
 | Factory Droid | Native plugin marketplace pointed at the CE GitHub repository | No, CE plugin install/convert target removed | Yes, before or during migration from previous `~/.factory` custom installs | Droid docs say Claude Code plugins install directly and are translated automatically; `ce-doc-review` was manually tested in Droid. |
-| OpenCode | Custom CE install to `~/.config/opencode/{skills,agents,commands,plugins}` plus merged `opencode.json` | Yes | Yes, every install | OpenCode plugins are JS/TS or npm hooks/tools, not a Claude-compatible marketplace install path for CE's full plugin payload. |
+| OpenCode | Custom CE install to `~/.config/opencode/{skills,agents,plugins}` plus merged `opencode.json`; source commands are written only if present | Yes | Yes, every install | OpenCode plugins are JS/TS or npm hooks/tools, not a Claude-compatible marketplace install path for CE's full plugin payload. |
 | Codex | Custom CE install to `~/.codex/skills/compound-engineering/<skill>` | Yes, until Codex has a simple distributed plugin marketplace/install flow | Yes, every install | Avoid `~/.agents/skills` so Codex installs do not shadow Copilot's native plugin skills. Current output converts Claude agents into generated Codex skills; TOML custom agents remain a future migration option. |
-| Gemini CLI | Custom CE install to `~/.gemini/{skills,agents,commands}` for now; native extension packaging remains a future distribution option | Yes, until Gemini extension distribution is solved | Yes, every install | Avoid `~/.agents/skills`; write normalized Gemini agents to `~/.gemini/agents`. |
+| Gemini CLI | Custom CE install to `~/.gemini/{skills,agents}` for now; source commands are written only if present; native extension packaging remains a future distribution option | Yes, until Gemini extension distribution is solved | Yes, every install | Avoid `~/.agents/skills`; write normalized Gemini agents to `~/.gemini/agents`. |
 
 Deprecated targets:
 
@@ -22,6 +22,11 @@ Deprecated targets:
 Removed capabilities:
 
 - Personal Claude Code home sync (`bunx @every-env/compound-plugin sync`) has been removed. Syncing arbitrary `~/.claude` skills, commands, agents, and MCP config across unrelated harnesses is not a bounded compatibility surface; CE only supports installing the CE plugin and cleaning up old CE-owned artifacts.
+
+Current CE command posture:
+
+- The `compound-engineering` plugin currently ships no Claude `commands/` files. Its workflow entry points are skills invoked with slash syntax, such as `/ce-plan`, `/ce-work`, and `/ce-doc-review`.
+- The CLI still understands source plugin commands for legacy cleanup and for converting non-CE Claude plugins that still ship commands. CE install docs should not describe commands as part of the current CE payload except as legacy/source-plugin compatibility.
 
 ## Global Decision: Avoid `~/.agents` For CE-Owned Installs
 
@@ -34,7 +39,7 @@ Use target-owned roots instead:
 ```text
 OpenCode: ~/.config/opencode/skills/<skill>/SKILL.md
           ~/.config/opencode/agents/<agent>.md
-          ~/.config/opencode/commands/*.md
+          ~/.config/opencode/commands/*.md  # source commands only, if present
           ~/.config/opencode/opencode.json
 
 Codex:  ~/.codex/skills/compound-engineering/<skill>/SKILL.md
@@ -42,7 +47,7 @@ Codex:  ~/.codex/skills/compound-engineering/<skill>/SKILL.md
 
 Gemini: ~/.gemini/skills/<skill>/SKILL.md
         ~/.gemini/agents/<agent>.md
-        ~/.gemini/commands/*.toml
+        ~/.gemini/commands/*.toml  # source commands only, if present
 
 Copilot: managed by native plugin install under ~/.copilot
 Droid:   managed by native plugin install under ~/.factory for user scope
@@ -59,7 +64,7 @@ Claude Code is already satisfied by the current repo layout:
 - Root marketplace: `.claude-plugin/marketplace.json`
 - Plugin root: `plugins/compound-engineering/`
 - Plugin manifest: `plugins/compound-engineering/.claude-plugin/plugin.json`
-- Plugin components: `agents/`, `skills/`, `commands/`, and related files under the plugin root
+- Plugin components: `agents/`, `skills/`, and related files under the plugin root. Claude `commands/` would be supported if reintroduced, but CE does not currently ship them.
 
 Users install with:
 
@@ -176,7 +181,7 @@ OpenCode's current install/discovery model is file-based:
 - Commands can be configured in `opencode.json` or as Markdown files under `~/.config/opencode/commands/` or `.opencode/commands/`.
 - Plugins are JavaScript/TypeScript modules loaded from `.opencode/plugins/` or `~/.config/opencode/plugins/`, or npm packages listed in the `plugin` option in `opencode.json`.
 
-OpenCode has a plugin system, but it is not equivalent to Claude/Copilot/Droid plugin marketplaces. The official docs describe JS/TS hooks, custom tools, local plugin files, and npm package loading. They do not document a native marketplace command that can point at the CE GitHub repository, read `.claude-plugin/marketplace.json`, and install CE skills/agents/commands as a complete plugin.
+OpenCode has a plugin system, but it is not equivalent to Claude/Copilot/Droid plugin marketplaces. The official docs describe JS/TS hooks, custom tools, local plugin files, and npm package loading. They do not document a native marketplace command that can point at the CE GitHub repository, read `.claude-plugin/marketplace.json`, and install CE skills and agents as a complete plugin.
 
 ### Decision
 
@@ -186,12 +191,12 @@ Keep the custom CE OpenCode writer for now:
 ~/.config/opencode/opencode.json
 ~/.config/opencode/skills/<skill>/SKILL.md
 ~/.config/opencode/agents/<agent>.md
-~/.config/opencode/commands/*.md
+~/.config/opencode/commands/*.md  # source commands only, if present
 ~/.config/opencode/plugins/*.ts
 ~/.config/opencode/compound-engineering/install-manifest.json
 ```
 
-This matches OpenCode's documented global config root and lets CE convert the full Claude-authored payload: skills, agents, commands, hooks/plugins, and MCP config. An npm OpenCode plugin could be useful later for hooks/tools, but it would not replace the need to place CE skills and agents into OpenCode's discovery roots unless OpenCode adds a richer package/install surface.
+This matches OpenCode's documented global config root and lets CE convert the full Claude-authored payload: skills, agents, hooks/plugins, MCP config, and source commands if a plugin ships them. An npm OpenCode plugin could be useful later for hooks/tools, but it would not replace the need to place CE skills and agents into OpenCode's discovery roots unless OpenCode adds a richer package/install surface.
 
 Avoid `~/.agents/skills` for CE-managed OpenCode installs for the same reason as Codex and Gemini: OpenCode can read that shared root, but Copilot can also read it and shadow native plugin skills.
 
@@ -447,7 +452,7 @@ For now, keep a custom CE Gemini install path and write directly to Gemini-owned
 ```text
 ~/.gemini/skills/<skill-name>/SKILL.md
 ~/.gemini/agents/<agent-name>.md
-~/.gemini/commands/*.toml
+~/.gemini/commands/*.toml  # source commands only, if present
 ~/.gemini/compound-engineering/install-manifest.json
 ```
 

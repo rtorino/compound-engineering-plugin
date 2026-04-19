@@ -19,7 +19,7 @@ Compound engineering inverts this. 80% is in planning and review, 20% is in exec
 
 **Learn more**
 
-- [Full component reference](plugins/compound-engineering/README.md) - all agents, commands, skills
+- [Full component reference](plugins/compound-engineering/README.md) - all agents and skills
 - [Compound engineering: how Every codes with agents](https://every.to/chain-of-thought/compound-engineering-how-every-codes-with-agents)
 - [The story behind compounding engineering](https://every.to/source-code/my-ai-had-already-fixed-the-code-before-i-saw-it)
 
@@ -31,7 +31,7 @@ Brainstorm -> Plan -> Work -> Review -> Compound -> Repeat
   Ideate (optional -- when you need ideas)
 ```
 
-| Command | Purpose |
+| Skill | Purpose |
 |---------|---------|
 | `/ce-ideate` | Discover high-impact project improvements through divergent ideation and adversarial filtering |
 | `/ce-brainstorm` | Explore requirements and approaches before planning |
@@ -152,12 +152,12 @@ Cleanup moves known CE artifacts into a `compound-engineering/legacy-backup/` di
 
 | Target | Output path | Notes |
 |--------|------------|-------|
-| `opencode` | `~/.config/opencode/` | Commands as `.md` files; `opencode.json` MCP config deep-merged; backups made before overwriting |
-| `codex` | `~/.codex/prompts` + `~/.codex/skills/<plugin>/` | Claude commands become prompt + skill pairs when present; CE skills install under a namespaced Codex skill root; deprecated `workflows:*` aliases are omitted; legacy CE `.agents` symlinks are cleaned up but no new `.agents` files are written |
+| `opencode` | `~/.config/opencode/` | Skills and agents are written to OpenCode discovery roots; `opencode.json` MCP config is deep-merged; source commands, if present, are written as `.md` files |
+| `codex` | `~/.codex/prompts` + `~/.codex/skills/<plugin>/` | CE skills install under a namespaced Codex skill root; Claude source commands, if present, become prompt + skill pairs; deprecated `workflows:*` aliases are omitted; legacy CE `.agents` symlinks are cleaned up but no new `.agents` files are written |
 | `pi` | `~/.pi/agent/` | Prompts, skills, extensions, and `mcporter.json` for MCPorter interoperability |
-| `gemini` | `~/.gemini/` | Skills under `skills/`, subagents under `agents/`, commands as `.toml`; namespaced commands become directories (`workflows:plan` -> `commands/workflows/plan.toml`) |
+| `gemini` | `~/.gemini/` | Skills under `skills/` and subagents under `agents/`; source commands, if present, are written as `.toml` |
 | `kiro` | `.kiro/` | Agents as JSON configs + prompt `.md` files; only stdio MCP servers supported |
-| `qwen` | `~/.qwen/extensions/<plugin>/` | Agents as `.yaml`; env vars with placeholders extracted as settings; colon separator for nested commands |
+| `qwen` | `~/.qwen/extensions/<plugin>/` | Skills and agents are written into a Qwen extension; env vars with placeholders are extracted as settings; source command names preserve colon separators when present |
 
 All provider targets are experimental and may change as the formats evolve.
 
