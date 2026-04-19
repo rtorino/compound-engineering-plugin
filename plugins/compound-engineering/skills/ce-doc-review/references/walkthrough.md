@@ -142,7 +142,7 @@ C. Skip — don't apply, don't append
 D. LFG the rest — apply the agent's best judgment to this and remaining findings
 ```
 
-**Mark the post-tie-break recommendation with `(recommended)` on its option label.** Required, not optional. Any of the four options can carry it:
+**Mark the post-tie-break recommendation with `(recommended)` on its option label.** Required, not optional. Only A, B, or C can carry it — synthesis emits `recommended_action` as Apply/Defer/Skip, which maps to A/B/C. D (`LFG the rest`) is a workflow shortcut for bulk execution across remaining findings, not a finding-level resolution action, so it is never marked `(recommended)`.
 
 ```
 A. Apply the proposed fix  (recommended)
@@ -194,7 +194,7 @@ C. Acknowledge without applying — record the decision, no document edit
 
 - **A. Defer to Open Questions** — invoke the append flow from `references/open-questions-defer.md` as though the user had originally picked Defer. Failure-path handling is identical (Retry / Fall back / Convert to Skip). On success, record the append location in the decision list (annotated `redirected from Apply — no suggested_fix`) and advance.
 - **B. Skip** — record Skip in the decision list (annotated `redirected from Apply — no suggested_fix`). Advance. No side effects.
-- **C. Acknowledge without applying** — record the finding in the decision list as `acknowledged` (annotated `Apply picked but no suggested_fix — no edit dispatched`). Do not add to the Apply set. Advance. The completion report groups acknowledged entries alongside the Skipped bucket with the acknowledgement reason surfaced on the per-finding line.
+- **C. Acknowledge without applying** — record the finding in the decision list as `acknowledged` (annotated `Apply picked but no suggested_fix — no edit dispatched`). Do not add to the Apply set. Advance. The completion report groups acknowledged entries alongside the Skipped bucket with the acknowledgement reason surfaced on the per-finding line. Acknowledged decisions carry forward in the multi-round decision primer as a rejected-class decision (alongside Skip and Defer) so round-N+1 synthesis suppresses re-raises via R29 — semantically the user saw the finding, chose not to act, and wants it recorded, which is equivalent to Skip for round-to-round suppression.
 
 **Availability adaptation.** When `references/open-questions-defer.md` has cached `append_available: false` for the session, omit option A and surface one line in the stem explaining why (e.g., `Defer unavailable — document is read-only in this environment.`). The menu becomes Skip / Acknowledge without applying, with Skip labeled `(recommended)`.
 
