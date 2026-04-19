@@ -113,15 +113,15 @@ If multiple candidates match the criteria, elevate ALL of them. The criteria abo
 
 If none match, skip the rest of this step — no chains exist.
 
-**Dependent assignment under multiple roots.** When multiple roots exist and a candidate dependent could plausibly link to more than one, assign it to the root whose proposed fix most directly moots the dependent's fix. If ambiguity remains, assign to the higher-confidence root. A dependent never links to more than one root — a single `depends_on` value.
+**Dependent assignment under multiple roots.** When multiple roots exist and a candidate dependent could plausibly link to more than one, assign it to the root whose rejection most directly dissolves the dependent's concern. If ambiguity remains, assign to the higher-confidence root. A dependent never links to more than one root — a single `depends_on` value.
 
-**Step 2: Identify dependents.** For each candidate root, scan the remaining findings for dependents. A finding is a dependent of a root when:
+**Step 2: Identify dependents.** For each candidate root, scan the remaining findings for dependents. The predicate must match the cascade trigger in `references/walkthrough.md` — dependents cascade when the user rejects (Skip/Defer) the root, so dependency is defined on the rejection branch, not the acceptance branch. A finding is a dependent of a root when:
 
-- The root proposes removing, deferring, or fundamentally rethinking a named component. Shapes to recognize (not a vocabulary list — map to whatever the document's domain actually uses): remove a compatibility layer, defer a planned feature, question whether an abstraction is warranted, scope down a proposed change, reject a migration target, back out of an architectural commitment
+- The root challenges a foundational premise about a named component — questioning whether it should exist, whether the proposed approach is correct, or whether the work is justified. Shapes to recognize (not a vocabulary list — map to whatever the document's domain actually uses): a compatibility layer whose necessity is challenged, a planned feature whose justification is in doubt, an abstraction whose warrant is questioned, a proposed change whose scope is disputed, a migration target whose choice is contested, an architectural commitment whose basis is unsupported
 - The candidate's `suggested_fix` modifies, adds detail to, or constrains that same component
-- The candidate's fix becomes moot if the root's fix is accepted — meaning: under the root's proposed resolution, there is no component left for the candidate's fix to target
+- The candidate's concern would dissolve if the root's premise is rejected — meaning: if the user rejects the root (Skip/Defer), the component the dependent targets is no longer a settled part of the plan, so the dependent's fix has nothing stable to act on and batch-rejects with the root
 
-Test with the substitution check: "If the user accepts the root's fix, does the dependent's finding still describe a real problem in the resulting document?" If no, it is a dependent. If yes (the finding identifies an independent problem), it is not.
+Test with the substitution check: "If the user rejects the root (Skip/Defer), does the dependent's finding still describe an actionable concern the user would want to engage with this round?" If no — the dependent's premise dissolves alongside the root's — it is a dependent. If yes (the finding identifies a problem that survives root rejection), it is not.
 
 **Step 3: Independence safeguard.** Even when a finding's target component is addressed by the root, do NOT link if:
 
