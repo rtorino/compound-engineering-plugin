@@ -27,6 +27,8 @@ The per-finding `(recommended)` labeling lives inside the walk-through (option A
 
 If all remaining findings are FYI-subsection-only (no `gated_auto` or above-gate `manual` findings), skip the routing question entirely and flow to the Phase 5 terminal question.
 
+**Append-availability adaptation.** When `references/open-questions-defer.md` has cached `append_available: false` at Phase 4 start (e.g., read-only document, unwritable filesystem), option C is suppressed from the routing question because every per-finding Defer would fail into the open-questions failure path. The menu shows three options (A / B / D) and the stem appends one line explaining why (e.g., `Append to Open Questions unavailable — document is read-only in this environment.`). This mirrors the per-finding option B suppression described under "Adaptations" below — both routing-level and per-finding Defer paths share the same availability signal so the user never sees Defer surfaced at one level and omitted at the other.
+
 **Dispatch by selection:**
 
 - **A** — load this walk-through (per-finding loop). Apply decisions accumulate in memory; Open-Questions defers execute inline via `references/open-questions-defer.md`; Skip decisions are recorded as no-action; `LFG the rest` routes through `references/bulk-preview.md`.
@@ -52,7 +54,12 @@ Each finding's recommended action has already been normalized by synthesis step 
 
 1. Announce the cascade in the terminal before firing the next question: "Skipping/Deferring this root will auto-resolve N dependent finding(s): {titles}. Continue?"
 2. Use the platform's blocking question tool with two options: `Cascade — apply same action to all dependents` (recommended) and `Decide each dependent individually`. Labels must be self-contained per the AskUserQuestion rules.
-3. On Cascade: apply the root's action to every dependent, record each decision in the Apply/Defer set with a note `cascaded from {root_title}`, and skip those findings' walk-through entries. On Individual: proceed normally — the root's dependents each get their own walk-through entry.
+3. On Cascade: apply the root's action to every dependent and skip those findings' walk-through entries. Persistence follows the per-action routing rules from "Per-finding routing" below — the canonical home for every cascaded decision is the in-memory decision list (annotated with `cascaded from {root_title}` and the cascaded action), plus any action-specific side effect:
+   - Cascaded `Apply` — add the dependent id to the Apply set and record in the decision list.
+   - Cascaded `Defer` — invoke the open-questions append flow for the dependent and record the append outcome in the decision list. If the append fails, fall back to the per-finding failure path (Retry / Record only / Convert to Skip) for that dependent before advancing the cascade.
+   - Cascaded `Skip` — record in the decision list only; no Apply-set entry, no open-questions append.
+
+   On Individual: proceed normally — the root's dependents each get their own walk-through entry.
 
 When the user picks Apply on a root, do NOT cascade — the premise held, so dependents each need their own decision. Proceed through the walk-through normally.
 

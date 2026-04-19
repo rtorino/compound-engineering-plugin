@@ -79,7 +79,12 @@ Every merged finding carries exactly one `recommended_action` field consumed by 
 - Any persona flagging the finding as low-confidence or suppression-eligible via residual concerns → implies Skip
 - Persona in the contradiction set (3.5) implying "keep as-is / do not change" → implies Skip
 
-If the contributing personas are all silent on action (e.g., a merged `manual` finding from personas that all flagged it as observation without recommendation) → `recommended_action: Apply` as the pragmatic default; the walk-through still lets the user pick any of the four options.
+If the contributing personas are all silent on action (e.g., a merged `manual` finding from personas that all flagged it as observation without recommendation), pick the default based on whether the merged finding carries an executable `suggested_fix`:
+
+- `suggested_fix` present → `recommended_action: Apply` as the pragmatic default.
+- `suggested_fix` absent → `recommended_action: Defer` (the walk-through and LFG cannot execute Apply without a fix; routing an actionless finding to Defer surfaces it in Open Questions where the user can decide what to do with it).
+
+This gate holds for every branch of the tie-break: if the winning action is `Apply` but the merged finding has no `suggested_fix` after 3.6 (Promote) and 3.7 (Route) have run, downgrade to `Defer`. The walk-through still lets the user pick any of the four options; this rule only governs the agent's default recommendation so LFG and bulk-preview never schedule a non-executable Apply.
 
 **Conflict-context surface.** When the tie-break fires (contributing personas implied different actions), record a one-line conflict-context string on the merged finding. The walk-through renders this on the R15 conflict-context line (see `references/walkthrough.md`). Example: `Coherence recommends Apply; scope-guardian recommends Skip. Agent's recommendation: Skip.`
 

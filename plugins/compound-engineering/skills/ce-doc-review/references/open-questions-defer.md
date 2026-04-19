@@ -50,7 +50,13 @@ HTML-comment fields (machine-readable, used by Step 4 dedup):
 
 - `{normalized_section}` — `normalize(section)` (lowercase, punctuation-stripped, whitespace-collapsed)
 - `{normalized_title}` — `normalize(title)` (same normalization)
-- `{evidence_fingerprint}` — first ~120 chars of the finding's first evidence quote, word-boundary-preserving, internal quotes escaped; empty string when the finding had no evidence
+- `{evidence_fingerprint}` — first ~120 chars of the finding's first evidence quote, word-boundary-preserving, then sanitized for single-line HTML-comment embedding; empty string when the finding had no evidence. Sanitization (apply in order, before the 120-char slice so the resulting fingerprint stays under the budget):
+  1. Collapse any run of whitespace — including newlines, carriage returns, and tabs — to a single space.
+  2. Strip any occurrence of `-->` (HTML-comment terminator) and any stray `<!--` sequence; replace each with a single space. This prevents the evidence from closing the dedup-key comment prematurely or injecting a nested comment.
+  3. Replace the double-quote character with `\"` (quote escaping, as before).
+  4. Trim leading/trailing whitespace.
+
+  The sanitized fingerprint MUST be a single line with no embedded `-->` so the dedup-key comment stays parseable by Step 4's compound-key reconstruction. When computing the fingerprint for a new finding, apply this sanitization; when reading back from an existing entry, treat the parsed `evidence="..."` value as already-sanitized and compare verbatim.
 
 Do not include `suggested_fix` or the full `evidence` array in the appended entry. Those live in the review run artifact (when applicable) and do not belong in the document's Open Questions section — the entry is a concern summary for the reader returning later, not a full decision packet. The HTML-comment dedup-key line is the minimum machine-oriented metadata required for reliable idempotence and deliberately sits on a single line with simple `key="value"` shape so a retry can parse it without a markdown parser.
 
@@ -64,7 +70,7 @@ If an entry with the same compound key already exists under the same `### From Y
 **Compound key for dedup:** `normalize(section) + normalize(title) + evidence_fingerprint`, reconstructed from each existing entry's `<!-- dedup-key: ... -->` HTML comment (see Step 3 entry format). For a new finding about to append, compute the same fields from the finding's schema data; for existing entries, parse them out of the HTML comment. Match on all three fields.
 
 - `normalize(section)` and `normalize(title)` use the same normalization as synthesis step 3.3 dedup (lowercase, strip punctuation, collapse whitespace)
-- `evidence_fingerprint` is the first ~120 characters of the finding's first evidence quote (same slice used in the decision primer — see `SKILL.md` under "Decision primer"). When no evidence is available on the new finding, fall back to section+title alone. When an existing entry's HTML comment has `evidence=""`, treat the entry as evidence-less and also fall back to section+title for that comparison.
+- `evidence_fingerprint` is the first ~120 characters of the finding's first evidence quote, sanitized per Step 3 (whitespace collapsed to single spaces, `-->` and stray `<!--` stripped, quotes escaped). The same slice is used in the decision primer — see `SKILL.md` under "Decision primer". When no evidence is available on the new finding, fall back to section+title alone. When an existing entry's HTML comment has `evidence=""`, treat the entry as evidence-less and also fall back to section+title for that comparison. If an existing entry's dedup-key comment is malformed (e.g., a newline or `-->` sequence split the comment across lines in a pre-sanitization entry), treat that entry under the legacy-fallback rule below rather than attempting a partial reconstruction.
 
 Title-only dedup is not sufficient: two different findings in the same document (even in the same review date) can legitimately share a short title if their sections and evidence differ. Using only `{title}` would silently drop one of them — losing user-visible backlog context. The compound key mirrors the R29/R30 matching predicate (`section + title + evidence-substring overlap`) so cross-round and intra-round dedup behave consistently.
 
