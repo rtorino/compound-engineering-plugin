@@ -42,8 +42,21 @@ The walk-through receives, from the orchestrator:
 
 - The merged findings list in severity order (P0 → P1 → P2 → P3), filtered to `gated_auto` and `manual` findings that survived the per-severity confidence gate. FYI-subsection findings are not included — they surface in the final report only and have no walk-through entry.
 - The run id for artifact lookups (when applicable).
+- Premise-dependency chain annotations from synthesis step 3.5c: each finding may carry `depends_on: <root_id>` or `dependents: [<ids>]`.
 
 Each finding's recommended action has already been normalized by synthesis step 3.5b (Deterministic Recommended-Action Tie-Break, `Skip > Defer > Apply`) — the walk-through surfaces that recommendation via the merged finding's `recommended_action` field and does not recompute it.
+
+**Root-first iteration order.** When a finding has `dependents`, iterate it before any of its dependents regardless of severity order within the chain. The root always comes first so the user's root decision can cascade.
+
+**Cascading root decisions.** When the user picks Skip or Defer on a finding with `dependents`:
+
+1. Announce the cascade in the terminal before firing the next question: "Skipping/Deferring this root will auto-resolve N dependent finding(s): {titles}. Continue?"
+2. Use the platform's blocking question tool with two options: `Cascade — apply same action to all dependents` (recommended) and `Decide each dependent individually`. Labels must be self-contained per the AskUserQuestion rules.
+3. On Cascade: apply the root's action to every dependent, record each decision in the Apply/Defer set with a note `cascaded from {root_title}`, and skip those findings' walk-through entries. On Individual: proceed normally — the root's dependents each get their own walk-through entry.
+
+When the user picks Apply on a root, do NOT cascade — the premise held, so dependents each need their own decision. Proceed through the walk-through normally.
+
+**Orphaned dependents.** If a dependent's root was rejected in a prior round and the root is suppressed this round (per R29), treat the dependent as a standalone finding with no chain context. Do not reference the missing root.
 
 ---
 
