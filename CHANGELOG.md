@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.68.2] (2026-04-19)
+
+
+### Bug Fixes
+
+* **ce-test-browser:** auto-start dev server when the port isn't responding instead of skipping browser verification. Detects overmind / `bin/dev` / `npm run dev` / `rails server` from Procfile.dev, `bin/dev`, lockfiles, and project docs; launches in the background with a tmp log; polls for readiness with a 60s timeout; surfaces the log tail on failure. Closes the loophole where "server not running" would silently skip the browser phase of LFG/ralph-loop.
+
 ## [2.68.1](https://github.com/EveryInc/compound-engineering-plugin/compare/cli-v2.68.0...cli-v2.68.1) (2026-04-18)
 
 

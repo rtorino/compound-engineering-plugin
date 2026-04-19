@@ -20,9 +20,10 @@ Platform-specific hints:
 
 ## Prerequisites
 
-- Local development server running (e.g., `bin/dev`, `rails server`, `npm run dev`)
 - `agent-browser` CLI installed (see Setup below)
 - Git repository with changes to test
+
+The skill auto-starts the local dev server if it isn't already running (see Step 6). You no longer need to start `bin/dev` / `rails server` / `npm run dev` manually before invoking — the skill detects the dev command, launches it in the background, and waits for readiness before proceeding.
 
 ## Setup
 
@@ -122,25 +123,85 @@ PORT="${PORT:-3000}"
 echo "Using dev server port: $PORT"
 ```
 
-### 6. Verify Server is Running
+### 6. Verify Server is Running (auto-start if not)
+
+Browser verification is the whole point of this skill — do not skip it because the server isn't up. If the port is dead, start the dev server in the background and wait for it to come up before proceeding. Only abort if startup actually fails.
+
+**6a. Probe the port:**
 
 ```bash
-agent-browser open http://localhost:${PORT}
+if curl -sf -o /dev/null -m 2 "http://localhost:${PORT}/" \
+  || curl -sf -o /dev/null -m 2 "http://localhost:${PORT}/up" \
+  || curl -s -o /dev/null -m 2 -w '%{http_code}' "http://localhost:${PORT}/" | grep -qE '^(2|3|4)'; then
+  echo "Server already running on :${PORT}"
+  SERVER_UP=1
+else
+  SERVER_UP=0
+fi
+```
+
+If `SERVER_UP=1`, skip to Step 7.
+
+**6b. Detect the dev command.** Priority order:
+
+1. **Overmind session already live** — if the project has a `Procfile.dev` and `.overmind.sock` is a responsive socket (`overmind ps` succeeds), the web process is probably crashed rather than absent. Use `overmind restart web` instead of starting a second stack.
+2. **Stale overmind socket** — if `.overmind.sock` or `tmp/overmind.sock` exists but `overmind ps` errors with "connection refused", clean it up (`rm -f .overmind.sock tmp/overmind.sock` and `pkill -f 'overmind start'`) before starting fresh.
+3. **Procfile.dev present** — use `bin/dev` (Rails + Overmind convention).
+4. **`bin/dev` exists** — use `bin/dev`.
+5. **`package.json` has a `dev` script** — use `npm run dev` (or `yarn dev` / `pnpm dev` based on lockfile: `yarn.lock` → yarn, `pnpm-lock.yaml` → pnpm, else npm).
+6. **Rails app without Procfile** — use `bin/rails server -p ${PORT}`.
+7. **Explicit project override** — if `AGENTS.md` / `CLAUDE.md` documents a different dev command, honor that.
+
+If none of these match, stop and tell the user: "Could not auto-detect a dev command. Start your server manually and re-run, or document the command in AGENTS.md."
+
+**6c. Start in the background with a log file:**
+
+```bash
+DEV_LOG="/tmp/ce-test-browser-dev-${PORT}.log"
+echo "Starting dev server with: ${DEV_CMD}"
+echo "Log: ${DEV_LOG}"
+nohup bash -c "${DEV_CMD}" > "${DEV_LOG}" 2>&1 &
+DEV_PID=$!
+echo "Dev server PID: ${DEV_PID}"
+```
+
+**6d. Poll for readiness with a bounded timeout (60s):**
+
+```bash
+for i in $(seq 1 60); do
+  if curl -sf -o /dev/null -m 2 "http://localhost:${PORT}/" \
+    || curl -sf -o /dev/null -m 2 "http://localhost:${PORT}/up" \
+    || curl -s -o /dev/null -m 2 -w '%{http_code}' "http://localhost:${PORT}/" | grep -qE '^(2|3|4)'; then
+    echo "Server ready on :${PORT} after ${i}s"
+    SERVER_UP=1
+    break
+  fi
+  sleep 1
+done
+```
+
+**6e. If startup failed, fail loudly with the log tail:**
+
+```bash
+if [ "${SERVER_UP}" != "1" ]; then
+  echo "Dev server did not come up on :${PORT} within 60s."
+  echo "Last 40 lines of ${DEV_LOG}:"
+  tail -n 40 "${DEV_LOG}"
+  echo "Fix the underlying issue and re-run, or start the server manually."
+  exit 1
+fi
+```
+
+**6f. Verify with agent-browser:**
+
+```bash
+agent-browser open "http://localhost:${PORT}"
 agent-browser snapshot -i
 ```
 
-If the server is not running, inform the user:
+If this still fails after a successful HTTP probe, the server is up but not serving the app — surface the failure with the log tail and stop.
 
-```
-Server not running on port ${PORT}
-
-Please start your development server:
-- Rails: `bin/dev` or `rails server`
-- Node/Next.js: `npm run dev`
-- Custom port: run this skill again with `--port <your-port>`
-
-Then re-run this skill.
-```
+**Tell the user you started the server.** Something like: "Dev server wasn't running on :${PORT} — started it in the background (PID ${DEV_PID}, log: ${DEV_LOG}). Continuing with tests." The user needs to know a long-lived process is now running under their shell.
 
 ### 7. Test Each Affected Page
 
