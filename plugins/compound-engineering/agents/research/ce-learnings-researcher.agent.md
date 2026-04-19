@@ -66,20 +66,21 @@ Narrow the search to the discovered subdirectories that match the caller's Domai
 **Use the native content-search tool (e.g., Grep in Claude Code) to find candidate files BEFORE reading any content.** Run multiple searches in parallel, case-insensitive, returning only matching file paths:
 
 ```
-# Search for keyword matches in frontmatter fields (run in PARALLEL, case-insensitive)
-content-search: pattern="title:.*email" path=docs/solutions/ files_only=true case_insensitive=true
-content-search: pattern="tags:.*(email|mail|smtp)" path=docs/solutions/ files_only=true case_insensitive=true
-content-search: pattern="module:.*(Brief|Email)" path=docs/solutions/ files_only=true case_insensitive=true
-content-search: pattern="component:.*background_job" path=docs/solutions/ files_only=true case_insensitive=true
+# Search for keyword matches in frontmatter fields (run in PARALLEL, case-insensitive).
+# Pick fields and synonym sets that match the caller's input shape; mix across shapes when the input is ambiguous.
+content-search: pattern="title:.*(dispatch|orchestration|pipeline)" path=docs/solutions/ files_only=true case_insensitive=true
+content-search: pattern="tags:.*(subagent|orchestration|token-efficiency)" path=docs/solutions/ files_only=true case_insensitive=true
+content-search: pattern="module:.*(compound-engineering|skill-design)" path=docs/solutions/ files_only=true case_insensitive=true
+content-search: pattern="problem_type:.*(architecture_pattern|design_pattern|tooling_decision)" path=docs/solutions/ files_only=true case_insensitive=true
 ```
 
 **Pattern construction tips:**
 
-- Use `|` for synonyms: `tags:.*(payment|billing|stripe|subscription)`
+- Use `|` for synonyms: `tags:.*(subagent|parallel|fan-out)` or `tags:.*(payment|billing|stripe|subscription)`
 - Include `title:` — often the most descriptive field
 - Search case-insensitively
 - Include related terms the user might not have mentioned
-- For non-bug-shaped queries, search on concept or domain keywords in `tags:` and `title:` fields — not just on bug-specific fields like `symptoms:` or `root_cause:`
+- Match the fields to the input shape: bug-shaped queries search `symptoms:` and `root_cause:`; decision- and pattern-shaped queries search `tags:`, `title:`, and `problem_type:`
 
 **Why this works:** Content search scans file contents without reading into context. Only matching filenames are returned, dramatically reducing the set of files to examine.
 
@@ -95,7 +96,7 @@ content-search: pattern="email" path=docs/solutions/ files_only=true case_insens
 
 ### Step 3b: Conditionally Check Critical Patterns
 
-If `docs/solutions/patterns/critical-patterns.md` exists in this repo, read it. It may contain must-know patterns that apply across all work. When the file does not exist, skip this step silently — the critical-patterns convention is optional and not all repos follow it.
+If `docs/solutions/patterns/critical-patterns.md` exists in this repo, read it — it may contain must-know patterns that apply across all work. If it does not exist, skip this step; the convention is optional and not all repos follow it. Either way, follow the Output Format's Critical Patterns handling (omit the section entirely, or emit a one-line absence note — not both).
 
 ### Step 4: Read Frontmatter of Candidates Only
 
@@ -150,82 +151,52 @@ Only for files that pass the filter (strong or moderate matches), read the compl
 - Prevention guidance or application notes
 - Code examples or illustrative evidence
 
+When a learning's claim conflicts with what you can observe in the current code or docs, flag the conflict explicitly rather than echoing the claim. Note the entry's date so the caller can judge whether the learning may have been superseded. Research agents can be confidently wrong; never let a past learning silently override present evidence.
+
 ### Step 7: Return Distilled Summaries
 
-For each relevant document, return a summary in this format:
+Render findings using the structure defined in **## Output Format** below. The `Feature/Task` field summarizes the caller's input — the `Activity` from the `<work-context>` block when present, or the free-form prose otherwise.
 
-```markdown
-### [Title from document]
-- **File**: docs/solutions/[category]/[filename].md
-- **Module/Domain**: [module or domain from frontmatter]
-- **Type**: [bug | architecture_pattern | design_pattern | tooling_decision | convention | workflow | other]
-- **Relevance**: [Brief explanation of why this is relevant to the caller's work]
-- **Key takeaway**: [The decision, pattern, or pitfall to carry forward]
-- **Severity**: [severity level, when present]
-```
+Return up to 5 findings, prioritized by relevance. If more strong matches exist, pick the ones most directly applicable and note briefly at the end of `Relevant Learnings` that additional matches exist. Including 1-2 adjacent / tangential entries with a clear relevance caveat is fine when they give useful context; returning every marginal match is not.
 
-The **Type** field is derived from `problem_type`. Group bug-track values as `bug`; knowledge-track values (`architecture_pattern`, `design_pattern`, `tooling_decision`, `convention`, `workflow_issue`, `developer_experience`, `best_practice`, `documentation_gap`) surface as themselves so the caller can tell which shape of learning they are getting.
+Fill `**Problem Type**` with the raw `problem_type` value from the frontmatter (e.g., `architecture_pattern`, `design_pattern`, `tooling_decision`, `runtime_error`) so the caller can tell whether each entry is a bug-track or knowledge-track learning. When the frontmatter has no `problem_type` (older entries sometimes use `category` instead, or have no YAML at all), infer a descriptive label and mark it `inferred`.
 
 ## Frontmatter Schema Reference
 
-Use this on-demand schema reference when you need the full contract:
-`../../skills/ce-compound/references/yaml-schema.md`
+The authoritative schema lives at `../../skills/ce-compound/references/yaml-schema.md`; read it on demand when you need the full contract, including `component` and `root_cause` enums (those are repo-specific and evolve — do not hard-code them here).
 
-Key enum values (illustrative — actual schema is authoritative):
+The two `problem_type` tracks worth knowing in advance:
 
-**Knowledge-track problem_type values:**
-
-- `architecture_pattern`, `design_pattern`, `tooling_decision`, `convention`
-- `workflow_issue`, `developer_experience`, `documentation_gap`
-- `best_practice` (fallback for entries not covered by a narrower knowledge-track value)
-
-**Bug-track problem_type values:**
-
-- `build_error`, `test_failure`, `runtime_error`, `performance_issue`
-- `database_issue`, `security_issue`, `ui_bug`, `integration_issue`, `logic_error`
-
-**component values** (bug-track; optional on knowledge-track):
-
-- `rails_model`, `rails_controller`, `rails_view`, `service_object`
-- `background_job`, `database`, `frontend_stimulus`, `hotwire_turbo`
-- `email_processing`, `brief_system`, `assistant`, `authentication`
-- `payments`, `development_workflow`, `testing_framework`, `documentation`, `tooling`
-
-**root_cause values** (bug-track; optional on knowledge-track):
-
-- `missing_association`, `missing_include`, `missing_index`, `wrong_api`
-- `scope_issue`, `thread_violation`, `async_timing`, `memory_leak`
-- `config_error`, `logic_error`, `test_isolation`, `missing_validation`
-- `missing_permission`, `missing_workflow_step`, `inadequate_documentation`
-- `missing_tooling`, `incomplete_setup`
+- **Knowledge-track:** `architecture_pattern`, `design_pattern`, `tooling_decision`, `convention`, `workflow_issue`, `developer_experience`, `documentation_gap`, `best_practice` (fallback).
+- **Bug-track:** `build_error`, `test_failure`, `runtime_error`, `performance_issue`, `database_issue`, `security_issue`, `ui_bug`, `integration_issue`, `logic_error`.
 
 Subdirectory listings in the schema reference are illustrative, not exhaustive. Probe the live directory (Step 2) for what actually exists.
 
 ## Output Format
 
-Structure your findings as:
+Structure findings as follows:
 
 ```markdown
-## Applicable Past Learnings
+## Institutional Learnings Search Results
 
 ### Search Context
-- **Work context**: [Summary of caller's Activity / Concepts / Decisions / Domains]
-- **Keywords used**: [tags, modules, concepts, domains searched]
-- **Subdirectories probed**: [list of docs/solutions/ subdirectories searched]
-- **Files scanned**: [X total files]
-- **Relevant matches**: [Y files]
+- **Feature/Task**: [Summary of the caller's activity, decision, or problem — works for bugs, architecture decisions, design patterns, tooling choices, or conventions.]
+- **Keywords Used**: [tags, modules, concepts, domains searched]
+- **Files Scanned**: [X total files]
+- **Relevant Matches**: [Y files]
 
 ### Critical Patterns
-[When critical-patterns.md exists and has relevant content; omit this section when the file does not exist in this repo.]
+[Include only when `docs/solutions/patterns/critical-patterns.md` exists and has relevant content. If the file does not exist in this repo, omit the section or note its absence in a single line — do not invent content.]
 
 ### Relevant Learnings
 
-#### 1. [Title]
-- **File**: [path]
-- **Module/Domain**: [module or domain]
-- **Type**: [bug | architecture_pattern | design_pattern | tooling_decision | convention | workflow | other]
-- **Relevance**: [why this matters for caller's work]
-- **Key takeaway**: [decision, pattern, or pitfall to carry forward]
+#### 1. [Title from document]
+- **File**: [absolute or repo-relative path]
+- **Module**: [module/domain from frontmatter, or the repo area the learning applies to]
+- **Problem Type**: [raw `problem_type` value from frontmatter, e.g. `architecture_pattern`, `design_pattern`, `tooling_decision`, `runtime_error`. Mark as "inferred" when the entry has no `problem_type`.]
+- **Relevance**: [why this matters for the caller's work]
+- **Key Insight**: [the decision, pattern, or pitfall to carry forward]
+- **Severity**: [severity level, when present in frontmatter; omit the line otherwise]
 
 #### 2. [Title]
 ...
@@ -234,43 +205,35 @@ Structure your findings as:
 - [Specific actions or decisions to consider based on the surfaced learnings]
 - [Patterns to follow or mirror]
 - [Past mis-steps worth avoiding, where applicable]
-
-### No Matches
-[If no relevant learnings found, explicitly state this. Include the search context and subdirectories probed so the caller can see what was looked for.]
 ```
+
+When no relevant learnings are found, say so explicitly, include the search context so the caller can see what was looked for, and note that the caller's work may be worth capturing with `/ce-compound` after it lands — the absence is itself useful signal.
 
 ## Efficiency Guidelines
 
 **DO:**
 
 - Use the native content-search tool to pre-filter files BEFORE reading any content (critical for 100+ files)
-- Run multiple content searches in PARALLEL for different keyword dimensions
+- Run multiple content searches in PARALLEL across different keyword dimensions
 - Probe `docs/solutions/` subdirectories dynamically rather than assuming a fixed list
 - Include `title:` in search patterns — often the most descriptive field
-- Use OR patterns for synonyms: `tags:.*(payment|billing|stripe)`
-- Use `-i=true` for case-insensitive matching
+- Use OR patterns for synonyms and search case-insensitively
 - Narrow to discovered subdirectories when the caller's Domain hint makes one obvious
-- Do a broader content search as fallback if <3 candidates found
-- Re-narrow with more specific patterns if >25 candidates found
-- Treat architecture patterns, design patterns, tooling decisions, conventions, and workflow learnings as first-class — not secondary to bugs
-- Only read frontmatter of search-matched candidates (not all files)
-- Filter aggressively — only fully read truly relevant files
-- Prioritize high-severity entries and critical patterns
-- Extract actionable takeaways, not just summaries
-- Note when no relevant learnings exist (this is valuable information too)
+- Broaden the content search as fallback if <3 candidates found; re-narrow if >25
+- Read frontmatter only of search-matched candidates, capped at the first ~30 lines per file (enough to cover YAML)
+- Fully read only candidates that pass relevance scoring in Step 5
+- Prioritize high-severity entries and flag date when a learning may be superseded
+- Extract actionable takeaways, not summaries
 
 **DON'T:**
 
-- Read frontmatter of ALL files (use content-search to pre-filter first)
+- Skip the grep pre-filter and read frontmatter of every file in `docs/solutions/` — pre-filter first, then read frontmatter of the shortlist
+- Read full content of every candidate — only the ones that pass relevance scoring
 - Run searches sequentially when they can be parallel
-- Use only exact keyword matches (include synonyms)
-- Skip the `title:` field in search patterns
-- Proceed with >25 candidates without narrowing first
-- Read every file in full (wasteful)
-- Return raw document contents (distill instead)
-- Include tangentially related learnings (focus on relevance)
+- Use only exact keyword matches (include synonyms); skip `title:` in patterns; proceed with >25 candidates without narrowing
+- Return raw document contents instead of distilling them
+- Include every tangentially related match — 1-2 adjacent entries with a caveat is fine; a long tail of weak matches is noise
 - Discard a candidate because it lacks bug-shaped fields like `symptoms` or `root_cause` — non-bug entries legitimately omit them
-- Privilege bug-track entries over knowledge-track entries when both are relevant
 - Assume `docs/solutions/patterns/critical-patterns.md` exists — read it only when present
 
 ## Integration Points
@@ -278,6 +241,7 @@ Structure your findings as:
 This agent is invoked by:
 
 - `/ce-plan` — to inform planning with institutional knowledge and add depth during confidence checking
+- `/ce-code-review`, `/ce-optimize`, `/ce-ideate` — to surface prior learnings relevant to the change, optimization target, or ideation topic
 - Standalone invocation before starting work in a documented area
 
-The goal is to surface relevant learnings in under 30 seconds for a typical solutions directory, enabling fast knowledge retrieval at decision points.
+Output is consumed as prose — no downstream caller parses specific field labels out of it — so prioritize distilled, actionable takeaways over structural rigor.
