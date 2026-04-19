@@ -18,6 +18,35 @@ Return ONLY valid JSON matching the findings schema below. No prose, no markdown
 
 {schema}
 
+**Schema conformance — hard constraints (use these exact values; validation rejects anything else):**
+
+- `severity`: one of `"P0"`, `"P1"`, `"P2"`, `"P3"` — use these exact strings. Do NOT use `"high"`, `"medium"`, `"low"`, `"critical"`, or any other vocabulary, even if your persona's prose discusses priorities in those terms conceptually.
+- `finding_type`: one of `"error"`, `"omission"` — nothing else (no `"tension"`, `"concern"`, `"observation"`, etc.).
+- `autofix_class`: one of `"safe_auto"`, `"gated_auto"`, `"manual"`.
+- `evidence`: an ARRAY of strings with at least one element. A single string value is a validation failure — wrap every quote in `["..."]` even when there is only one.
+- `confidence`: a number between 0.0 and 1.0 inclusive.
+
+If your persona description uses severity vocabulary like "high-priority" or "critical" in its rubric text, translate to the P0-P3 scale at emit time. "Critical / must-fix" → P0, "important / should-fix" → P1, "worth-noting / could-fix" → P2, "low-signal" → P3. Same for priorities described qualitatively in your analysis — map to P0-P3 on the way out.
+
+Example of a schema-valid finding (all required fields, correct enum values, correct array shape):
+
+```json
+{
+  "title": "Deployment ordering between migration and code unspecified",
+  "severity": "P0",
+  "section": "Unit 4",
+  "why_it_matters": "The plan acknowledges both deploy orderings produce incorrect state but resolves neither, leaving implementers with no safe deploy recipe.",
+  "finding_type": "omission",
+  "autofix_class": "gated_auto",
+  "suggested_fix": "Require Units 1-4 to land in a single atomic PR, or define the sequence explicitly.",
+  "confidence": 0.92,
+  "evidence": [
+    "If the migration runs before Units 1-3 land, the code reads stale data.",
+    "If after, new code temporarily sees old entries until migration runs."
+  ]
+}
+```
+
 Rules:
 
 - You are a leaf reviewer inside an already-running compound-engineering review workflow. Do not invoke compound-engineering skills or agents unless this template explicitly instructs you to. Perform your analysis directly and return findings in the required output format only.
@@ -83,6 +112,8 @@ False-positive categories to actively suppress:
 - Issues that belong to other personas (see your Suppress conditions)
 - Findings already resolved elsewhere in the document (search before flagging)
 - Content inside `## Deferred / Open Questions` sections (prior-round review output, not document content)
+
+**Advisory observations — route to FYI, do not force a decision.** If the honest answer to "what actually breaks if we don't fix this?" is "nothing breaks, but…", the finding is advisory. Ask: would a competent implementer hit a wrong outcome, a production bug, a misleading plan, or rework later? If no, set confidence in the **0.40–0.59 LOW/Advisory band** so synthesis routes the finding to FYI rather than surfacing it as a manual decision. Do not suppress — the observation still has value; it just does not warrant user judgment. Typical advisory shapes: naming asymmetry with no wrong answer, stylistic preference without evidence of impact, speculative future-work concern with no current signal, subjective readability note, theoretical scalability concern without baseline data, "could also be split" organizational preference when the current split is not broken.
 </output-contract>
 
 <review-context>
