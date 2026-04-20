@@ -209,6 +209,96 @@ describe("CLI", () => {
     expect(await fs.readFile(path.join(userOwnedSkillDir, "SKILL.md"), "utf8")).toBe(userOwnedSkillContent)
   })
 
+  test("cleanup migrates manifest-listed Codex artifacts that moved between CE versions", async () => {
+    // Scenario: a prior CE install emitted agents as generated skills under
+    // `skills/<plugin>/<agent-name>/` and wrote an install manifest listing
+    // those agent-skills plus a stale prompt. The current CE emits agents as
+    // TOML custom agents instead, so those manifest-listed skills and the
+    // stale prompt are no longer in the current bundle. Cleanup alone (no
+    // subsequent install) must migrate them to legacy-backup, otherwise they
+    // shadow the current install.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-codex-manifest-"))
+    const codexRoot = path.join(tempRoot, ".codex")
+    const agentsRoot = path.join(tempRoot, ".agents")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    // Namespaced managed skills dir with stale agent-as-skill entries and one
+    // current-named skill that must survive.
+    const staleAgentSkills = [
+      "ce-correctness-reviewer",  // current agent name, old generated-skill emission
+      "ce-feasibility-reviewer",  // same
+      "ce-adversarial-reviewer",  // same
+    ]
+    for (const skillName of staleAgentSkills) {
+      const dir = path.join(codexRoot, "skills", "compound-engineering", skillName)
+      await fs.mkdir(dir, { recursive: true })
+      await fs.writeFile(path.join(dir, "SKILL.md"), `stale agent-as-skill ${skillName}`)
+    }
+    // A current-named skill the prior install also tracked.
+    await fs.mkdir(path.join(codexRoot, "skills", "compound-engineering", "ce-plan"), { recursive: true })
+    await fs.writeFile(
+      path.join(codexRoot, "skills", "compound-engineering", "ce-plan", "SKILL.md"),
+      "current namespaced skill",
+    )
+    // Stale prompt from the prior install.
+    await fs.mkdir(path.join(codexRoot, "prompts"), { recursive: true })
+    await fs.writeFile(path.join(codexRoot, "prompts", "ce-plan.md"), "stale prompt from prior CE version")
+
+    // Install manifest listing all the prior-install artifacts.
+    const managedDir = path.join(codexRoot, "compound-engineering")
+    await fs.mkdir(managedDir, { recursive: true })
+    await fs.writeFile(
+      path.join(managedDir, "install-manifest.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          pluginName: "compound-engineering",
+          skills: [...staleAgentSkills, "ce-plan"],
+          prompts: ["ce-plan.md"],
+          agents: [],
+        },
+        null,
+        2,
+      ),
+    )
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "codex",
+      "--codex-home",
+      codexRoot,
+      "--agents-home",
+      agentsRoot,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    // Stale agent-skills migrated to legacy-backup.
+    for (const skillName of staleAgentSkills) {
+      expect(await exists(path.join(codexRoot, "skills", "compound-engineering", skillName))).toBe(false)
+    }
+    // Current-named namespaced skill survives (it's in the current bundle).
+    expect(await exists(path.join(codexRoot, "skills", "compound-engineering", "ce-plan"))).toBe(true)
+    // Stale prompt migrated (ce-plan is a skill now, not a command/prompt in current CE).
+    expect(await exists(path.join(codexRoot, "prompts", "ce-plan.md"))).toBe(false)
+    // Backup tree created.
+    expect(await exists(path.join(codexRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
   test("cleanup backs up legacy OpenCode artifacts on demand", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-opencode-"))
     const opencodeRoot = path.join(tempRoot, ".opencode")

@@ -23,6 +23,7 @@ import {
   getLegacyWindsurfArtifacts,
 } from "../data/plugin-legacy-artifacts"
 import { moveLegacyArtifactToBackup } from "../targets/managed-artifacts"
+import { readCodexInstallManifest } from "../targets/codex"
 import { pathExists, readJson, sanitizePathName } from "../utils/files"
 import { resolveOpenCodeGlobalRoot } from "../utils/opencode-config"
 import { expandHome, resolveTargetHome } from "../utils/resolve-home"
@@ -240,6 +241,8 @@ async function cleanupCodex(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>
     ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
     ...bundle.generatedSkills.map((skill) => sanitizePathName(skill.name)),
   ])
+  const currentPrompts = new Set(bundle.prompts.map((prompt) => `${sanitizePathName(prompt.name)}.md`))
+  const currentAgents = new Set((bundle.agents ?? []).map((agent) => `${sanitizePathName(agent.name)}.toml`))
   const managedDir = path.join(codexRoot, plugin.manifest.name)
   let moved = 0
   for (const skillName of artifacts.skills) {
@@ -257,6 +260,43 @@ async function cleanupCodex(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>
   for (const promptFile of artifacts.prompts) {
     moved += await moveIfExists(managedDir, "prompts", path.join(codexRoot, "prompts"), promptFile, "Codex")
   }
+
+  // Manifest-driven migration: read the previous install's manifest and
+  // migrate any entries that are no longer in the current bundle. This
+  // catches artifacts whose *type or emission format* has changed between
+  // CE versions (e.g., agents that were previously emitted as generated
+  // skills under `skills/<plugin>/<agent-name>/` but are now emitted as
+  // TOML custom agents under `agents/<plugin>/<name>.toml`). The historical
+  // allow-list only covers renamed/removed names — it does not cover
+  // current-named artifacts that moved locations.
+  const installedManifest = await readCodexInstallManifest(codexRoot, plugin.manifest.name)
+  if (installedManifest) {
+    for (const skillName of installedManifest.skills) {
+      if (currentNamespacedSkills.has(skillName)) continue
+      moved += await moveIfExists(
+        managedDir,
+        "skills",
+        path.join(codexRoot, "skills", plugin.manifest.name),
+        skillName,
+        "Codex",
+      )
+    }
+    for (const promptFile of installedManifest.prompts) {
+      if (currentPrompts.has(promptFile)) continue
+      moved += await moveIfExists(managedDir, "prompts", path.join(codexRoot, "prompts"), promptFile, "Codex")
+    }
+    for (const agentFile of installedManifest.agents) {
+      if (currentAgents.has(agentFile)) continue
+      moved += await moveIfExists(
+        managedDir,
+        "agents",
+        path.join(codexRoot, "agents", plugin.manifest.name),
+        agentFile,
+        "Codex",
+      )
+    }
+  }
+
   return { target: "codex", root: codexRoot, moved }
 }
 
