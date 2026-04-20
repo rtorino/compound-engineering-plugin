@@ -24,6 +24,7 @@ import {
 } from "../data/plugin-legacy-artifacts"
 import { moveLegacyArtifactToBackup } from "../targets/managed-artifacts"
 import { pathExists, readJson, sanitizePathName } from "../utils/files"
+import { resolveOpenCodeGlobalRoot } from "../utils/opencode-config"
 import { expandHome, resolveTargetHome } from "../utils/resolve-home"
 
 const cleanupTargets = ["codex", "opencode", "pi", "gemini", "kiro", "copilot", "droid", "qwen", "windsurf"] as const
@@ -69,7 +70,7 @@ export default defineCommand({
     opencodeHome: {
       type: "string",
       alias: "opencode-home",
-      description: "OpenCode root to clean (default: ~/.config/opencode)",
+      description: "OpenCode root to clean (default: $OPENCODE_CONFIG_DIR or ~/.config/opencode)",
     },
     geminiHome: {
       type: "string",
@@ -119,7 +120,9 @@ export default defineCommand({
     const roots = {
       codexHome: resolveTargetHome(args.codexHome, path.join(os.homedir(), ".codex")),
       piHome: resolveTargetHome(args.piHome, path.join(os.homedir(), ".pi", "agent")),
-      opencodeHome: resolveTargetHome(args.opencodeHome, path.join(os.homedir(), ".config", "opencode")),
+      // Mirror install: respect OPENCODE_CONFIG_DIR before falling back to the
+      // XDG default so cleanup scans the same directory install wrote to.
+      opencodeHome: resolveTargetHome(args.opencodeHome, resolveOpenCodeGlobalRoot()),
       geminiHome: resolveTargetHome(args.geminiHome, path.join(os.homedir(), ".gemini")),
       kiroHome: resolveTargetHome(args.kiroHome, path.join(outputRoot, ".kiro")),
       copilotHome: resolveTargetHome(args.copilotHome, path.join(os.homedir(), ".copilot")),

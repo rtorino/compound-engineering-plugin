@@ -9,7 +9,7 @@ import { pathExists } from "../utils/files"
 import type { ClaudeToOpenCodeOptions, PermissionMode } from "../converters/claude-to-opencode"
 import { ensureCodexAgentsFile } from "../utils/codex-agents"
 import { expandHome, resolveTargetHome } from "../utils/resolve-home"
-import { resolveTargetOutputRoot } from "../utils/resolve-output"
+import { resolveOpenCodeWriteScope, resolveTargetOutputRoot } from "../utils/resolve-output"
 import { detectInstalledTools } from "../utils/detect-tools"
 
 const permissionModes: PermissionMode[] = ["none", "broad", "from-commands"]
@@ -86,7 +86,7 @@ export default defineCommand({
 
     try {
       const plugin = await loadClaudePlugin(resolvedPlugin.path)
-      const { root: outputRoot, isOpenCodeGlobalRoot } = resolveOutputRoot(args.output)
+      const outputRoot = resolveOutputRoot(args.output)
       const codexHome = resolveTargetHome(args.codexHome, path.join(os.homedir(), ".codex"))
       const piHome = resolveTargetHome(args.piHome, path.join(os.homedir(), ".pi", "agent"))
       const hasExplicitOutput = Boolean(args.output && String(args.output).trim())
@@ -134,7 +134,8 @@ export default defineCommand({
             pluginName: plugin.manifest.name,
             hasExplicitOutput,
           })
-          const writeScope = tool.name === "opencode" && isOpenCodeGlobalRoot ? "global" : undefined
+          const writeScope =
+            tool.name === "opencode" ? resolveOpenCodeWriteScope(hasExplicitOutput, undefined) : undefined
           await handler.write(root, bundle, writeScope)
           console.log(`Installed ${plugin.manifest.name} to ${tool.name} at ${root}`)
         }
@@ -169,9 +170,7 @@ export default defineCommand({
         scope: resolvedScope,
       })
       const effectiveScope =
-        targetName === "opencode" && isOpenCodeGlobalRoot && resolvedScope === undefined
-          ? "global"
-          : resolvedScope
+        targetName === "opencode" ? resolveOpenCodeWriteScope(hasExplicitOutput, resolvedScope) : resolvedScope
       await target.write(primaryOutputRoot, bundle, effectiveScope)
       console.log(`Installed ${plugin.manifest.name} to ${primaryOutputRoot}`)
 
@@ -194,14 +193,18 @@ export default defineCommand({
         }
         const extraRoot = resolveTargetOutputRoot({
           targetName: extra,
-          outputRoot: path.join(outputRoot, extra),
+          outputRoot,
           codexHome,
           piHome,
           pluginName: plugin.manifest.name,
           hasExplicitOutput,
           scope: handler.defaultScope,
         })
-        await handler.write(extraRoot, extraBundle, handler.defaultScope)
+        const extraScope =
+          extra === "opencode"
+            ? resolveOpenCodeWriteScope(hasExplicitOutput, handler.defaultScope)
+            : handler.defaultScope
+        await handler.write(extraRoot, extraBundle, extraScope)
         console.log(`Installed ${plugin.manifest.name} to ${extraRoot}`)
       }
 
@@ -250,19 +253,17 @@ function parseExtraTargets(value: unknown): string[] {
     .filter(Boolean)
 }
 
-function resolveOutputRoot(value: unknown): { root: string; isOpenCodeGlobalRoot: boolean } {
+function resolveOutputRoot(value: unknown): string {
   if (value && String(value).trim()) {
     const expanded = expandHome(String(value).trim())
-    return { root: path.resolve(expanded), isOpenCodeGlobalRoot: false }
+    return path.resolve(expanded)
   }
-  // OpenCode global config: respect OPENCODE_CONFIG_DIR if set (NixOS, Docker,
-  // non-default XDG_CONFIG_HOME), otherwise fall back to ~/.config/opencode
-  // per the XDG spec. See: https://opencode.ai/docs/config/
-  const envDir = process.env.OPENCODE_CONFIG_DIR?.trim()
-  if (envDir) {
-    return { root: path.resolve(expandHome(envDir)), isOpenCodeGlobalRoot: true }
-  }
-  return { root: path.join(os.homedir(), ".config", "opencode"), isOpenCodeGlobalRoot: true }
+  // Per-target defaults are applied in `resolveTargetOutputRoot` -- e.g.,
+  // OpenCode falls back to `OPENCODE_CONFIG_DIR` / `~/.config/opencode`,
+  // Codex falls back to `~/.codex`. Falling through to `process.cwd()` keeps
+  // workspace-rooted targets (gemini, kiro) using the user's project root
+  // when neither `--output` nor a target-specific home flag was supplied.
+  return process.cwd()
 }
 
 async function resolveBundledPluginPath(pluginName: string): Promise<string | null> {

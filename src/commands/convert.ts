@@ -6,7 +6,7 @@ import { targets, validateScope } from "../targets"
 import type { ClaudeToOpenCodeOptions, PermissionMode } from "../converters/claude-to-opencode"
 import { ensureCodexAgentsFile } from "../utils/codex-agents"
 import { expandHome, resolveTargetHome } from "../utils/resolve-home"
-import { resolveTargetOutputRoot } from "../utils/resolve-output"
+import { resolveOpenCodeWriteScope, resolveTargetOutputRoot } from "../utils/resolve-output"
 import { detectInstalledTools } from "../utils/detect-tools"
 
 const permissionModes: PermissionMode[] = ["none", "broad", "from-commands"]
@@ -123,7 +123,9 @@ export default defineCommand({
           pluginName: plugin.manifest.name,
           hasExplicitOutput,
         })
-        await handler.write(root, bundle)
+        const writeScope =
+          tool.name === "opencode" ? resolveOpenCodeWriteScope(hasExplicitOutput, undefined) : undefined
+        await handler.write(root, bundle, writeScope)
         console.log(`Converted ${plugin.manifest.name} to ${tool.name} at ${root}`)
       }
 
@@ -158,7 +160,9 @@ export default defineCommand({
       throw new Error(`Target ${targetName} did not return a bundle.`)
     }
 
-    await target.write(primaryOutputRoot, bundle, resolvedScope)
+    const effectiveScope =
+      targetName === "opencode" ? resolveOpenCodeWriteScope(hasExplicitOutput, resolvedScope) : resolvedScope
+    await target.write(primaryOutputRoot, bundle, effectiveScope)
     console.log(`Converted ${plugin.manifest.name} to ${targetName} at ${primaryOutputRoot}`)
 
     const extraTargets = parseExtraTargets(args.also)
@@ -180,14 +184,18 @@ export default defineCommand({
       }
       const extraRoot = resolveTargetOutputRoot({
         targetName: extra,
-        outputRoot: path.join(outputRoot, extra),
+        outputRoot,
         codexHome,
         piHome,
         pluginName: plugin.manifest.name,
         hasExplicitOutput,
         scope: handler.defaultScope,
       })
-      await handler.write(extraRoot, extraBundle, handler.defaultScope)
+      const extraScope =
+        extra === "opencode"
+          ? resolveOpenCodeWriteScope(hasExplicitOutput, handler.defaultScope)
+          : handler.defaultScope
+      await handler.write(extraRoot, extraBundle, extraScope)
       console.log(`Converted ${plugin.manifest.name} to ${extra} at ${extraRoot}`)
     }
 

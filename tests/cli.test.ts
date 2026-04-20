@@ -1167,6 +1167,193 @@ describe("CLI", () => {
     expect(await exists(path.join(codexRoot, "AGENTS.md"))).toBe(true)
   })
 
+  test("install --to codex --also opencode without --output writes opencode to global root, not nested", async () => {
+    // Regression for the cluster bug: when --output was unset and --to was a
+    // non-opencode primary, the --also flow joined `<opencode-global>/opencode`
+    // because the install-side default root was hardcoded to the OpenCode
+    // global config. The OpenCode default is now applied per-target inside
+    // resolveTargetOutputRoot, so --also opencode lands at the global config
+    // root regardless of the primary target.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-also-opencode-from-codex-"))
+    const fixtureRoot = path.join(import.meta.dir, "fixtures", "sample-plugin")
+    const codexRoot = path.join(tempRoot, ".codex")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "install",
+      fixtureRoot,
+      "--to",
+      "codex",
+      "--also",
+      "opencode",
+      "--codex-home",
+      codexRoot,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+        // Strip any inherited OPENCODE_CONFIG_DIR so we exercise the XDG
+        // fallback path deterministically.
+        OPENCODE_CONFIG_DIR: "",
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    const opencodeGlobalRoot = path.join(tempRoot, ".config", "opencode")
+    // Flat global layout, not nested under .opencode/. The bug previously
+    // wrote to `<global>/opencode/...` which is invisible to OpenCode.
+    expect(await exists(path.join(opencodeGlobalRoot, "opencode.json"))).toBe(true)
+    expect(await exists(path.join(opencodeGlobalRoot, "agents", "repo-research-analyst.md"))).toBe(true)
+    expect(await exists(path.join(opencodeGlobalRoot, "opencode", "opencode.json"))).toBe(false)
+    // Codex still landed at the explicit --codex-home.
+    expect(await exists(path.join(codexRoot, "AGENTS.md"))).toBe(true)
+  })
+
+  test("install --to opencode --also codex without --output keeps opencode at global root", async () => {
+    // Symmetry check for the cluster bug: confirm the --also extras loop does
+    // not push the primary OpenCode target through path.join(outputRoot, ...)
+    // either. Without --output, opencode should still resolve to the global
+    // config root.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-also-codex-from-opencode-"))
+    const fixtureRoot = path.join(import.meta.dir, "fixtures", "sample-plugin")
+    const codexRoot = path.join(tempRoot, ".codex")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "install",
+      fixtureRoot,
+      "--to",
+      "opencode",
+      "--also",
+      "codex",
+      "--codex-home",
+      codexRoot,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+        OPENCODE_CONFIG_DIR: "",
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    const opencodeGlobalRoot = path.join(tempRoot, ".config", "opencode")
+    expect(await exists(path.join(opencodeGlobalRoot, "opencode.json"))).toBe(true)
+    expect(await exists(path.join(opencodeGlobalRoot, "agents", "repo-research-analyst.md"))).toBe(true)
+    expect(await exists(path.join(codexRoot, "AGENTS.md"))).toBe(true)
+  })
+
+  test("install --to opencode without --output respects OPENCODE_CONFIG_DIR", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-opencode-env-"))
+    const customRoot = path.join(tempRoot, "custom-opencode-config")
+    const fixtureRoot = path.join(import.meta.dir, "fixtures", "sample-plugin")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "install",
+      fixtureRoot,
+      "--to",
+      "opencode",
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+        OPENCODE_CONFIG_DIR: customRoot,
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(await exists(path.join(customRoot, "opencode.json"))).toBe(true)
+    expect(await exists(path.join(customRoot, "agents", "repo-research-analyst.md"))).toBe(true)
+    // Make sure we did NOT also write to the XDG default path.
+    expect(await exists(path.join(tempRoot, ".config", "opencode", "opencode.json"))).toBe(false)
+  })
+
+  test("cleanup --target opencode without --opencode-home respects OPENCODE_CONFIG_DIR", async () => {
+    // Mirrors install: cleanup must scan the same directory install would
+    // write to, so a setup that relocates OpenCode config via env (NixOS,
+    // Docker, non-default XDG) gets its stale artifacts backed up.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-opencode-env-"))
+    const customRoot = path.join(tempRoot, "custom-opencode-config")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    await fs.mkdir(path.join(customRoot, "skills", "creating-agent-skills"), { recursive: true })
+    await fs.writeFile(path.join(customRoot, "skills", "creating-agent-skills", "SKILL.md"), "legacy deleted skill")
+    await fs.mkdir(path.join(customRoot, "agents"), { recursive: true })
+    await fs.writeFile(path.join(customRoot, "agents", "bug-reproduction-validator.md"), "legacy deleted agent")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "opencode",
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+        OPENCODE_CONFIG_DIR: customRoot,
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(stdout).toContain("Cleaned opencode")
+    expect(stdout).toContain(customRoot)
+    expect(await exists(path.join(customRoot, "skills", "creating-agent-skills"))).toBe(false)
+    expect(await exists(path.join(customRoot, "agents", "bug-reproduction-validator.md"))).toBe(false)
+    expect(await exists(path.join(customRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
   test("convert supports --pi-home for pi output", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-pi-home-"))
     const piRoot = path.join(tempRoot, ".pi")
