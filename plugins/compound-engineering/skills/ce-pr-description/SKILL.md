@@ -86,19 +86,19 @@ if [ -z "$CURRENT_BRANCH" ]; then
   exit 1
 fi
 
-# Priority: caller-supplied base: > existing PR's baseRefName > origin/HEAD
+# Priority: caller-supplied base: > existing PR's baseRefName > origin/HEAD > origin/main
 if [ -n "$CALLER_BASE" ]; then
   BASE_REF="$CALLER_BASE"
+elif EXISTING_PR_BASE=$(gh pr view --json baseRefName --jq '.baseRefName'); then
+  BASE_REF="origin/$EXISTING_PR_BASE"
+elif DEFAULT_HEAD=$(git rev-parse --abbrev-ref origin/HEAD); then
+  BASE_REF="$DEFAULT_HEAD"
 else
-  EXISTING_PR_BASE=$(gh pr view --json baseRefName --jq '.baseRefName' 2>/dev/null)
-  if [ -n "$EXISTING_PR_BASE" ]; then
-    BASE_REF="origin/$EXISTING_PR_BASE"
-  else
-    BASE_REF=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null)
-    BASE_REF="${BASE_REF:-origin/main}"
-  fi
+  BASE_REF="origin/main"
 fi
 ```
+
+Both `gh pr view` and `git rev-parse --abbrev-ref origin/HEAD` exit non-zero on the "not configured" paths; the elif chain drives off exit code rather than suppressed stderr. Stderr from a missing PR or unresolved `origin/HEAD` is informational and acceptable.
 
 If `$BASE_REF` does not resolve locally (`git rev-parse --verify "$BASE_REF"` fails), the caller (or the user) needs to fetch it first. Exit gracefully with `"Base ref $BASE_REF does not resolve locally. Fetch it before invoking the skill."` — do not attempt recovery.
 
@@ -389,7 +389,7 @@ Do not emit the body markdown in the return block — the caller reads it from `
 
 If Step 1 exited gracefully (closed/merged PR, invalid range, empty commit list), do not create a body file — just return the reason string.
 
-**The return block is a hand-off, not task completion.** When invoked by a parent skill (e.g., `git-commit-push-pr`), emit the return block and then continue executing the parent's remaining steps (typically `gh pr create` or `gh pr edit` with the returned title and body file). Do not stop after the return block unless invoked directly by the user with no parent workflow.
+**The return block is a hand-off, not task completion.** When invoked by a parent skill (e.g., `ce-commit-push-pr`), emit the return block and then continue executing the parent's remaining steps (typically `gh pr create` or `gh pr edit` with the returned title and body file). Do not stop after the return block unless invoked directly by the user with no parent workflow.
 
 ---
 

@@ -17,9 +17,9 @@ For description-only updates, follow the Description Update workflow below. Othe
 
 ## Context
 
-**If you are not Claude Code**, skip to the "Context fallback" section below and run the command there to gather context.
+**On platforms other than Claude Code**, skip to the "Context fallback" section below and run the command there to gather context.
 
-**If you are Claude Code**, the six labeled sections below contain pre-populated data. Use them directly -- do not re-run these commands.
+**In Claude Code**, the six labeled sections below contain pre-populated data. Use them directly -- do not re-run these commands.
 
 **Git status:**
 !`git status`
@@ -41,7 +41,7 @@ For description-only updates, follow the Description Update workflow below. Othe
 
 ### Context fallback
 
-**If you are Claude Code, skip this section — the data above is already available.**
+**In Claude Code, skip this section — the data above is already available.**
 
 Run this single command to gather all context:
 
