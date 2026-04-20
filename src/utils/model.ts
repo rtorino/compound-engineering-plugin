@@ -48,8 +48,8 @@ export function addProviderPrefix(model: string): string {
 }
 
 /**
- * Normalize a model for targets that use provider-prefixed IDs
- * (OpenCode, Qwen). Resolves bare aliases and adds provider prefix.
+ * Normalize a model for targets that use provider-prefixed IDs.
+ * Resolves bare aliases and adds provider prefix.
  *
  * "sonnet"                  -> "anthropic/claude-sonnet-4-6"
  * "claude-sonnet-4-20250514" -> "anthropic/claude-sonnet-4-20250514"

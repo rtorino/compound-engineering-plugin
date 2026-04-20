@@ -108,10 +108,24 @@ If you previously used the old Bun Droid install, back up stale CE artifacts bef
 bunx @every-env/compound-plugin cleanup --target droid
 ```
 
-### OpenCode, Codex, Pi, Gemini, Kiro & Qwen (experimental)
+### Qwen Code
 
-This repo includes a Bun/TypeScript CLI that converts Claude Code plugins to OpenCode, Codex, Pi, Gemini CLI, Kiro CLI, and Qwen Code.
-Use the native plugin install instructions above for Claude Code, GitHub Copilot CLI, and Factory Droid.
+```bash
+qwen extensions install EveryInc/compound-engineering-plugin:compound-engineering
+```
+
+Qwen Code installs Claude Code-compatible plugins directly from GitHub and converts the plugin format during install, so no Bun install step is needed.
+
+If you previously used the old Bun Qwen install, back up stale CE artifacts before switching to the native extension:
+
+```bash
+bunx @every-env/compound-plugin cleanup --target qwen
+```
+
+### OpenCode, Codex, Pi, Gemini & Kiro (experimental)
+
+This repo includes a Bun/TypeScript CLI that converts Claude Code plugins to OpenCode, Codex, Pi, Gemini CLI, and Kiro CLI.
+Use the native plugin install instructions above for Claude Code, GitHub Copilot CLI, Factory Droid, and Qwen Code.
 
 ```bash
 # convert the compound-engineering plugin into OpenCode format
@@ -129,9 +143,6 @@ bunx @every-env/compound-plugin install compound-engineering --to gemini
 # convert to Kiro CLI format
 bunx @every-env/compound-plugin install compound-engineering --to kiro
 
-# convert to Qwen Code format
-bunx @every-env/compound-plugin install compound-engineering --to qwen
-
 # auto-detect custom-install targets and install to all
 bunx @every-env/compound-plugin install compound-engineering --to all
 ```
@@ -142,6 +153,7 @@ The custom install targets run CE legacy cleanup during install. To run cleanup 
 bunx @every-env/compound-plugin cleanup --target codex
 bunx @every-env/compound-plugin cleanup --target opencode
 bunx @every-env/compound-plugin cleanup --target gemini
+bunx @every-env/compound-plugin cleanup --target qwen      # old Bun installs only
 bunx @every-env/compound-plugin cleanup --target windsurf  # deprecated legacy installs only
 ```
 
@@ -157,7 +169,6 @@ Cleanup moves known CE artifacts into a `compound-engineering/legacy-backup/` di
 | `pi` | `~/.pi/agent/` | Prompts, skills, extensions, and `mcporter.json` for MCPorter interoperability |
 | `gemini` | `~/.gemini/` | Skills under `skills/` and subagents under `agents/`; source commands, if present, are written as `.toml` |
 | `kiro` | `.kiro/` | Agents as JSON configs + prompt `.md` files; only stdio MCP servers supported |
-| `qwen` | `~/.qwen/extensions/<plugin>/` | Skills and agents are written into a Qwen extension; env vars with placeholders are extracted as settings; source command names preserve colon separators when present |
 
 All provider targets are experimental and may change as the formats evolve.
 

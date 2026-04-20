@@ -1,4 +1,31 @@
-# Install Strategy Inventory
+---
+title: "Native plugin install strategy for supported harnesses"
+date: 2026-04-19
+category: integrations
+module: installer
+problem_type: integration_decision
+component: installer
+symptoms:
+  - "Multiple harnesses can discover the same CE skills from shared roots and create duplicates or shadowing"
+  - "Some harnesses now support native Claude-compatible plugin installs, making custom Bun installs redundant"
+  - "Old manual installs can leave stale skills and agents after CE renames or deprecations"
+root_cause: evolving_platform_install_surfaces
+resolution_type: install_strategy
+severity: medium
+tags:
+  - install-strategy
+  - native-plugins
+  - legacy-cleanup
+  - codex
+  - copilot
+  - droid
+  - qwen
+  - gemini
+  - opencode
+  - kiro
+---
+
+# Native Plugin Install Strategy
 
 Last verified: 2026-04-19
 
@@ -11,9 +38,10 @@ This document records the intended install model by harness. The current priorit
 | Claude Code | Native plugin marketplace using existing `.claude-plugin/marketplace.json` and `plugins/compound-engineering/.claude-plugin/plugin.json` | No | Only for old/manual non-native installs, if any | Current repo shape already satisfies Claude Code. |
 | GitHub Copilot CLI | Native plugin marketplace using the same existing `.claude-plugin` metadata | No, CE plugin install/convert target removed | Yes, before or during migration from previous `.github/` custom installs | Tested manually: Copilot can install from the existing CE marketplace and load agents. |
 | Factory Droid | Native plugin marketplace pointed at the CE GitHub repository | No, CE plugin install/convert target removed | Yes, before or during migration from previous `~/.factory` custom installs | Droid docs say Claude Code plugins install directly and are translated automatically; `ce-doc-review` was manually tested in Droid. |
+| Qwen Code | Native extension install from the CE GitHub repository and existing Claude plugin metadata | No, CE plugin install/convert target removed | Yes, before or during migration from previous `~/.qwen` custom installs | Qwen docs say Claude Code extensions install directly from GitHub and are converted automatically; native install was manually tested on 2026-04-19. |
 | OpenCode | Custom CE install to `~/.config/opencode/{skills,agents,plugins}` plus merged `opencode.json`; source commands are written only if present | Yes | Yes, every install | OpenCode plugins are JS/TS or npm hooks/tools, not a Claude-compatible marketplace install path for CE's full plugin payload. |
 | Codex | Custom CE install to `~/.codex/skills/compound-engineering/<skill>` | Yes, until Codex has a simple distributed plugin marketplace/install flow | Yes, every install | Avoid `~/.agents/skills` so Codex installs do not shadow Copilot's native plugin skills. Current output converts Claude agents into generated Codex skills; TOML custom agents remain a future migration option. |
-| Gemini CLI | Custom CE install to `~/.gemini/{skills,agents}` for now; source commands are written only if present; native extension packaging remains a future distribution option | Yes, until Gemini extension distribution is solved | Yes, every install | Avoid `~/.agents/skills`; write normalized Gemini agents to `~/.gemini/agents`. |
+| Gemini CLI | Custom CE install to `~/.gemini/{skills,agents}` for now; source commands are written only if present; native extension packaging exists but does not fit CE's current repo/package layout | Yes, until CE ships a Gemini extension root, release artifact, or dedicated distribution branch/repo | Yes, every install | Avoid `~/.agents/skills`; write normalized Gemini agents to `~/.gemini/agents`. |
 
 Deprecated targets:
 
@@ -51,6 +79,7 @@ Gemini: ~/.gemini/skills/<skill>/SKILL.md
 
 Copilot: managed by native plugin install under ~/.copilot
 Droid:   managed by native plugin install under ~/.factory for user scope
+Qwen:    managed by native extension install under ~/.qwen
 ```
 
 `~/.agents/skills` remains a cleanup target only, because prior CE installs or experiments may have left shadowing skills there.
@@ -169,6 +198,43 @@ bunx @every-env/compound-plugin cleanup --target droid
 ```
 
 The cleanup command must not delete Droid's native plugin cache or user-authored Droid files. It should only remove artifacts proven to be CE-owned by an install manifest, known historical CE names, or generated CE metadata.
+
+## Qwen Code
+
+### Decision
+
+Qwen should use native extension install, not `bunx @every-env/compound-plugin install compound-engineering --to qwen`.
+The custom Qwen plugin install/convert target has been removed from the CLI target registry.
+
+Users install with:
+
+```bash
+qwen extensions install EveryInc/compound-engineering-plugin:compound-engineering
+```
+
+Qwen Code's extension docs say it can install Claude Code extensions directly from GitHub and convert Claude plugin metadata to Qwen extension metadata automatically. Manual testing on 2026-04-19 confirmed the CE plugin installed successfully through Qwen's native path.
+
+This is a better fit than the old custom writer because Qwen now owns the Claude-plugin compatibility layer. The old writer duplicated that logic and did not fully rewrite CE's agent-heavy skill content into Qwen subagent invocation syntax.
+
+### Cleanup
+
+The old custom Qwen target wrote CE-owned artifacts under `~/.qwen`, especially:
+
+- `~/.qwen/extensions/compound-engineering/` with CE-managed tracking keys in `qwen-extension.json`
+- `~/.qwen/skills/*`
+- `~/.qwen/agents/*.yaml`
+- `~/.qwen/agents/*.md`
+- `~/.qwen/commands/*.md`
+
+Before users migrate from the old Bun install to the native Qwen extension, legacy cleanup should remove or back up CE-owned generated files so the native extension is not shadowed by stale local artifacts.
+
+Run:
+
+```bash
+bunx @every-env/compound-plugin cleanup --target qwen
+```
+
+Cleanup only backs up the old extension root when it finds the CE-managed tracking keys written by the legacy writer. This avoids deleting Qwen's current native extension cache after a successful native install.
 
 ## OpenCode
 
@@ -458,12 +524,19 @@ For now, keep a custom CE Gemini install path and write directly to Gemini-owned
 
 The Gemini writer should copy pass-through skills to `~/.gemini/skills`, generate normalized flat Gemini subagents in `~/.gemini/agents`, and write command TOML files under `~/.gemini/commands` if CE ships commands again.
 
-Native Gemini extension packaging remains a future distribution option. It would require a generated extension root with `gemini-extension.json` at the repository/release archive root; current Gemini extension install does not support a documented monorepo `--path` flow.
+Gemini extension distribution is already supported. The CE blocker is packaging shape: our source repo is a multi-plugin repo and the CE plugin root is `plugins/compound-engineering/`, while Gemini extension installs expect `gemini-extension.json` at the extension source root. Current Gemini extension install does not support a documented monorepo `--path` flow.
+
+Native Gemini extension packaging should become the preferred Gemini distribution path once CE ships one of these shapes:
+
+- a generated extension root published as the repository or release archive root
+- a dedicated Gemini extension repository
+- a distribution branch whose root is the Gemini extension root
+
+That extension root should be generated/normalized, not just the Claude plugin directory with `gemini-extension.json` added, because Gemini loads direct `agents/*.md` files and validates Gemini-shaped agent frontmatter.
 
 Open questions to validate in implementation:
 
 - Whether Gemini supports any undocumented repository subdirectory syntax for extensions. Current docs and local help only show whole GitHub repository URLs or local paths.
-- Whether the current Claude plugin root can also be a valid Gemini extension root by adding `gemini-extension.json`, or whether Gemini-specific generated payload should live in a separate extension directory. Current evidence favors a generated/normalized payload because Gemini only loads direct `agents/*.md` files, CE agents are nested under category directories, and some CE agent frontmatter contains Claude-only fields.
 - Whether Gemini preview subagents are enabled by default for all users or require settings in some versions/environments.
 - How Gemini extension subagent invocation names map from nested Claude agent paths.
 

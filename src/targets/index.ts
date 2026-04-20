@@ -4,13 +4,11 @@ import { convertClaudeToCodex } from "../converters/claude-to-codex"
 import { convertClaudeToPi } from "../converters/claude-to-pi"
 import { convertClaudeToGemini } from "../converters/claude-to-gemini"
 import { convertClaudeToKiro } from "../converters/claude-to-kiro"
-import { convertClaudeToQwen } from "../converters/claude-to-qwen"
 import { writeOpenCodeBundle } from "./opencode"
 import { writeCodexBundle } from "./codex"
 import { writePiBundle } from "./pi"
 import { writeGeminiBundle } from "./gemini"
 import { writeKiroBundle } from "./kiro"
-import { writeQwenBundle } from "./qwen"
 
 export type TargetScope = "global" | "workspace"
 
@@ -79,11 +77,5 @@ export const targets: Record<string, TargetHandler> = {
     implemented: true,
     convert: convertClaudeToKiro as TargetHandler["convert"],
     write: writeKiroBundle as TargetHandler["write"],
-  },
-  qwen: {
-    name: "qwen",
-    implemented: true,
-    convert: convertClaudeToQwen as TargetHandler["convert"],
-    write: writeQwenBundle as TargetHandler["write"],
   },
 }

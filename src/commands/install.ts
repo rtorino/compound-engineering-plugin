@@ -28,7 +28,7 @@ export default defineCommand({
     to: {
       type: "string",
       default: "opencode",
-      description: "Target format (opencode | codex | pi | gemini | kiro | qwen | all)",
+      description: "Target format (opencode | codex | pi | gemini | kiro | all)",
     },
     output: {
       type: "string",
@@ -44,11 +44,6 @@ export default defineCommand({
       type: "string",
       alias: "pi-home",
       description: "Write Pi output to this Pi root (ex: ~/.pi/agent or ./.pi)",
-    },
-    qwenHome: {
-      type: "string",
-      alias: "qwen-home",
-      description: "Write Qwen output to this Qwen extensions root (ex: ~/.qwen/extensions)",
     },
     scope: {
       type: "string",
@@ -95,7 +90,6 @@ export default defineCommand({
       const codexHome = resolveTargetHome(args.codexHome, path.join(os.homedir(), ".codex"))
       const piHome = resolveTargetHome(args.piHome, path.join(os.homedir(), ".pi", "agent"))
       const hasExplicitOutput = Boolean(args.output && String(args.output).trim())
-      const qwenHome = resolveTargetHome(args.qwenHome, path.join(os.homedir(), ".qwen", "extensions"))
 
       const options: ClaudeToOpenCodeOptions = {
         agentMode: String(args.agentMode) === "primary" ? "primary" : "subagent",
@@ -108,7 +102,7 @@ export default defineCommand({
         const activeTargets = detected.filter((t) => t.detected && targets[t.name]?.implemented)
 
         if (activeTargets.length === 0) {
-          console.log("No installable AI coding tools detected. Use native plugin install for Claude Code, Copilot, and Droid.")
+          console.log("No installable AI coding tools detected. Use native plugin install for Claude Code, Copilot, Droid, and Qwen.")
           return
         }
 
@@ -137,7 +131,6 @@ export default defineCommand({
             outputRoot,
             codexHome,
             piHome,
-            qwenHome,
             pluginName: plugin.manifest.name,
             hasExplicitOutput,
           })
@@ -170,7 +163,6 @@ export default defineCommand({
         outputRoot,
         codexHome,
         piHome,
-        qwenHome,
         pluginName: plugin.manifest.name,
         hasExplicitOutput,
         scope: resolvedScope,
@@ -200,7 +192,6 @@ export default defineCommand({
           outputRoot: path.join(outputRoot, extra),
           codexHome,
           piHome,
-          qwenHome,
           pluginName: plugin.manifest.name,
           hasExplicitOutput,
           scope: handler.defaultScope,

@@ -16,13 +16,14 @@ import {
   getLegacyGeminiArtifacts,
   getLegacyOpenCodeArtifacts,
   getLegacyPiArtifacts,
+  getLegacyPluginArtifacts,
   getLegacyWindsurfArtifacts,
 } from "../data/plugin-legacy-artifacts"
 import { moveLegacyArtifactToBackup } from "../targets/managed-artifacts"
-import { pathExists, sanitizePathName } from "../utils/files"
+import { pathExists, readJson, sanitizePathName } from "../utils/files"
 import { expandHome, resolveTargetHome } from "../utils/resolve-home"
 
-const cleanupTargets = ["codex", "opencode", "pi", "gemini", "copilot", "droid", "windsurf"] as const
+const cleanupTargets = ["codex", "opencode", "pi", "gemini", "copilot", "droid", "qwen", "windsurf"] as const
 type CleanupTarget = typeof cleanupTargets[number]
 
 type CleanupResult = {
@@ -45,7 +46,7 @@ export default defineCommand({
     target: {
       type: "string",
       default: "all",
-      description: "Target to clean: codex | opencode | pi | gemini | copilot | droid | windsurf | all",
+      description: "Target to clean: codex | opencode | pi | gemini | copilot | droid | qwen | windsurf | all",
     },
     output: {
       type: "string",
@@ -82,6 +83,11 @@ export default defineCommand({
       alias: "droid-home",
       description: "Droid root to clean (default: ~/.factory)",
     },
+    qwenHome: {
+      type: "string",
+      alias: "qwen-home",
+      description: "Qwen root to clean for legacy Bun installs (default: ~/.qwen)",
+    },
     windsurfHome: {
       type: "string",
       alias: "windsurf-home",
@@ -108,6 +114,7 @@ export default defineCommand({
       geminiHome: resolveTargetHome(args.geminiHome, path.join(os.homedir(), ".gemini")),
       copilotHome: resolveTargetHome(args.copilotHome, path.join(os.homedir(), ".copilot")),
       droidHome: resolveTargetHome(args.droidHome, path.join(os.homedir(), ".factory")),
+      qwenHome: resolveTargetHome(args.qwenHome, path.join(os.homedir(), ".qwen")),
       windsurfHome: resolveTargetHome(args.windsurfHome, path.join(os.homedir(), ".codeium", "windsurf")),
       agentsHome: resolveTargetHome(args.agentsHome, path.join(os.homedir(), ".agents")),
       workspaceRoot: outputRoot,
@@ -137,6 +144,7 @@ async function cleanupTarget(
     geminiHome: string
     copilotHome: string
     droidHome: string
+    qwenHome: string
     windsurfHome: string
     agentsHome: string
     workspaceRoot: string
@@ -163,6 +171,8 @@ async function cleanupTarget(
     }
     case "droid":
       return [await cleanupDroid(plugin, roots.hasExplicitOutput ? resolveDroidWorkspaceRoot(roots.workspaceRoot) : roots.droidHome)]
+    case "qwen":
+      return [await cleanupQwen(plugin, roots.qwenHome)]
     case "windsurf": {
       const rootsToClean = roots.hasExplicitOutput
         ? [resolveWindsurfWorkspaceRoot(roots.workspaceRoot)]
@@ -323,6 +333,59 @@ async function cleanupDroid(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>
     moved += await moveIfExists(managedDir, "commands", path.join(droidRoot, "commands"), commandPath, "Droid")
   }
   return { target: "droid", root: droidRoot, moved }
+}
+
+async function cleanupQwen(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>, qwenRoot: string): Promise<CleanupResult> {
+  const managedDir = path.join(qwenRoot, plugin.manifest.name)
+  const extras = getLegacyPluginArtifacts(plugin.manifest.name)
+  const skillNames = new Set([
+    ...plugin.skills.map((skill) => sanitizePathName(skill.name)),
+    ...(extras.skills ?? []).map(sanitizePathName),
+  ])
+  const agentNames = new Set([
+    ...plugin.agents.map((agent) => sanitizePathName(agent.name)),
+    ...(extras.agents ?? []).map(sanitizePathName),
+  ])
+  const commandNames = new Set([
+    ...plugin.commands.map((command) => sanitizePathName(command.name)),
+    ...(extras.commands ?? []).map(sanitizePathName),
+  ])
+
+  let moved = 0
+
+  if (await isLegacyQwenExtensionInstall(qwenRoot, plugin.manifest.name)) {
+    moved += await moveIfExists(
+      managedDir,
+      "extensions",
+      path.join(qwenRoot, "extensions"),
+      plugin.manifest.name,
+      "Qwen",
+    )
+  }
+
+  for (const skillName of skillNames) {
+    moved += await moveIfExists(managedDir, "skills", path.join(qwenRoot, "skills"), skillName, "Qwen")
+  }
+  for (const agentName of agentNames) {
+    moved += await moveIfExists(managedDir, "agents", path.join(qwenRoot, "agents"), `${agentName}.yaml`, "Qwen")
+    moved += await moveIfExists(managedDir, "agents", path.join(qwenRoot, "agents"), `${agentName}.md`, "Qwen")
+  }
+  for (const commandName of commandNames) {
+    moved += await moveIfExists(managedDir, "commands", path.join(qwenRoot, "commands"), `${commandName}.md`, "Qwen")
+  }
+
+  return { target: "qwen", root: qwenRoot, moved }
+}
+
+async function isLegacyQwenExtensionInstall(qwenRoot: string, pluginName: string): Promise<boolean> {
+  const configPath = path.join(qwenRoot, "extensions", pluginName, "qwen-extension.json")
+  if (!(await pathExists(configPath))) return false
+  try {
+    const config = await readJson<Record<string, unknown>>(configPath)
+    return "_compound_managed_mcp" in config || "_compound_managed_keys" in config
+  } catch {
+    return false
+  }
 }
 
 async function cleanupWindsurf(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>, windsurfRoot: string): Promise<CleanupResult> {

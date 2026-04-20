@@ -104,7 +104,7 @@ describe("CLI", () => {
     const fixtureRoot = path.join(import.meta.dir, "fixtures", "sample-plugin")
     const repoRoot = path.join(import.meta.dir, "..")
 
-    for (const target of ["copilot", "droid"]) {
+    for (const target of ["copilot", "droid", "qwen"]) {
       const proc = Bun.spawn([
         "bun",
         "run",
@@ -267,6 +267,60 @@ describe("CLI", () => {
     expect(await exists(path.join(windsurfRoot, "skills", "repo-research-analyst"))).toBe(false)
     expect(await exists(path.join(windsurfRoot, "global_workflows", "workflows-plan.md"))).toBe(false)
     expect(await exists(path.join(windsurfRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
+  test("cleanup backs up legacy Qwen Bun artifacts for native migration", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-qwen-"))
+    const qwenRoot = path.join(tempRoot, ".qwen")
+    const extensionRoot = path.join(qwenRoot, "extensions", "compound-engineering")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    await fs.mkdir(extensionRoot, { recursive: true })
+    await fs.writeFile(
+      path.join(extensionRoot, "qwen-extension.json"),
+      JSON.stringify({
+        name: "compound-engineering",
+        _compound_managed_mcp: [],
+        _compound_managed_keys: ["name", "skills", "agents"],
+      }),
+    )
+    await fs.mkdir(path.join(qwenRoot, "skills", "ce-plan"), { recursive: true })
+    await fs.writeFile(path.join(qwenRoot, "skills", "ce-plan", "SKILL.md"), "legacy skill")
+    await fs.mkdir(path.join(qwenRoot, "agents"), { recursive: true })
+    await fs.writeFile(path.join(qwenRoot, "agents", "repo-research-analyst.yaml"), "legacy agent")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "qwen",
+      "--qwen-home",
+      qwenRoot,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(stdout).toContain("Cleaned qwen")
+    expect(await exists(extensionRoot)).toBe(false)
+    expect(await exists(path.join(qwenRoot, "skills", "ce-plan"))).toBe(false)
+    expect(await exists(path.join(qwenRoot, "agents", "repo-research-analyst.yaml"))).toBe(false)
+    expect(await exists(path.join(qwenRoot, "compound-engineering", "legacy-backup"))).toBe(true)
   })
 
   test("list returns plugins in a temp workspace", async () => {
@@ -825,10 +879,10 @@ describe("CLI", () => {
     expect(stdout).toContain("Installed compound-engineering to opencode")
     expect(stdout).toContain("Installed compound-engineering to pi")
     expect(stdout).toContain("Installed compound-engineering to kiro")
-    expect(stdout).toContain("Installed compound-engineering to qwen")
     expect(stdout).toContain("Installed compound-engineering to gemini")
     expect(stdout).toContain("droid — native plugin install; skipped")
     expect(stdout).toContain("copilot — native plugin install; skipped")
+    expect(stdout).toContain("qwen — native plugin install; skipped")
     expect(stdout).not.toContain("cursor")
 
     expect(await exists(path.join(tempHome, ".config", "opencode", "opencode.json"))).toBe(true)
@@ -836,6 +890,6 @@ describe("CLI", () => {
     expect(await exists(path.join(tempHome, ".pi", "agent", "skills", "skill-one", "SKILL.md"))).toBe(true)
     expect(await exists(path.join(tempCwd, ".gemini", "skills", "skill-one", "SKILL.md"))).toBe(true)
     expect(await exists(path.join(tempCwd, ".kiro", "skills", "skill-one", "SKILL.md"))).toBe(true)
-    expect(await exists(path.join(tempHome, ".qwen", "extensions", "compound-engineering", "qwen-extension.json"))).toBe(true)
+    expect(await exists(path.join(tempHome, ".qwen", "extensions", "compound-engineering", "qwen-extension.json"))).toBe(false)
   })
 })

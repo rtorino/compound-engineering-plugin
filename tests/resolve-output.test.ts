@@ -40,22 +40,4 @@ describe("resolveTargetOutputRoot", () => {
     expect(result).toBe("/tmp/output")
   })
 
-  test("qwen uses qwenHome + pluginName", () => {
-    const result = resolveTargetOutputRoot({
-      ...baseOptions,
-      targetName: "qwen",
-      qwenHome: "/custom/qwen/extensions",
-      pluginName: "my-plugin",
-    })
-    expect(result).toBe("/custom/qwen/extensions/my-plugin")
-  })
-
-  test("qwen falls back to default home when not provided", () => {
-    const result = resolveTargetOutputRoot({
-      ...baseOptions,
-      targetName: "qwen",
-      pluginName: "my-plugin",
-    })
-    expect(result).toBe(path.join(os.homedir(), ".qwen", "extensions", "my-plugin"))
-  })
 })
