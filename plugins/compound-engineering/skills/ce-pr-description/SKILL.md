@@ -216,10 +216,10 @@ Assess size (files, diff volume) and complexity (design decisions, trade-offs, c
 | Small + simple (typo, config, dep bump) | 1-2 sentences, no headers. Under ~300 characters. |
 | Small + non-trivial (bugfix, behavioral change) | Short narrative, ~3-5 sentences. No headers unless two distinct concerns. |
 | Medium feature or refactor | Narrative frame (before/after/scope), then what changed and why. Call out design decisions. |
-| Large or architecturally significant | Full narrative: problem context, approach (and why), key decisions, migration/rollback if relevant. |
+| Large or architecturally significant | Narrative frame + up to 3-5 design-decision callouts + 1-2 sentence test summary + key docs links. Target ~100 lines, cap ~150. For PRs with many mechanisms, use a Summary-level table to list them; do NOT create an H3 subsection per mechanism. Reviewers scrutinize decisions, not inventories — the diff and spec files carry the detail. If you find yourself writing 10+ subsections, consolidate to a table. |
 | Performance improvement | Include before/after measurements if available. Markdown table works well. |
 
-When in doubt, shorter is better. Match description weight to change weight.
+When in doubt, shorter is better. Match description weight to change weight. Large PRs need MORE selectivity, not MORE content.
 
 ---
 
@@ -247,6 +247,8 @@ If the repo has documented style preferences in context, follow those. Otherwise
 - **Markdown tables for data**: Before/after comparisons, performance numbers, or option trade-offs communicate well as tables.
 - **No empty sections**: If a section doesn't apply, omit it. No "N/A" or "None."
 - **Test plan — only when non-obvious**: Include when testing requires edge cases the reviewer wouldn't think of, hard-to-verify behavior, or specific setup. Omit when "run the tests" is the only useful guidance. When the branch adds test files, name them with what they cover.
+- **No Commits section**: GitHub already shows the commit list in its own tab. A Commits section in the PR body duplicates that without adding context. Omit unless the commits need annotations explaining their ordering or shipping rationale.
+- **No Review / process section**: Do not include a section describing how the reviewer should review (checklists of things to look at, process bullets). Process doesn't help the reviewer evaluate code. Call out specific non-obvious things to scrutinize inline with the change that warrants it.
 
 ### Visual communication
 
@@ -341,6 +343,23 @@ Assemble the body in this order:
 | Gemini CLI | `googlegemini` | `4285F4` |
 
 **Model slug:** Replace spaces with underscores. Append context window and thinking level in parentheses if known. Examples: `Opus_4.6_(1M,_Extended_Thinking)`, `Sonnet_4.6_(200K)`, `Gemini_3.1_Pro`.
+
+---
+
+## Step 8b: Compression pass
+
+Before writing the body to the temp file, re-read the composed body and apply these cuts:
+
+- If any body section restates content already in the `## Summary`, remove it. The Summary plus the diff should carry the reader.
+- If "Testing" or "Test plan" has more than 2 paragraphs, compress to bullets.
+- If a "Commits" section enumerates the commit log, remove it — GitHub shows it in its own tab.
+- If a "Review" or process-oriented section lists how to review, remove it. Move any truly non-obvious review hints inline with the relevant change.
+- If the body has 5+ H3 subsections that each describe one mechanism, consolidate them into a single table row per mechanism under one header. Reserve prose H3 callouts for 2-3 genuine design decisions.
+- If the body exceeds the sizing-table target by more than 30%, compress the longest non-Summary section by half.
+
+**Value-lead check.** Re-read the first sentence of the Summary. If it describes what was moved around, renamed, or added ("This PR introduces three-tier autofix..."), rewrite to lead with what's now possible or what was broken and is now fixed ("Document reviews previously produced 14+ findings requiring user judgment; this PR cuts that to 4-6.").
+
+Large PRs benefit from selectivity, not comprehensiveness.
 
 ---
 
