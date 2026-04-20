@@ -59,9 +59,13 @@ async function mergeOpenCodeConfig(
   }
 }
 
-export async function writeOpenCodeBundle(outputRoot: string, bundle: OpenCodeBundle): Promise<void> {
+export async function writeOpenCodeBundle(
+  outputRoot: string,
+  bundle: OpenCodeBundle,
+  scope?: string,
+): Promise<void> {
   const pluginName = bundle.pluginName ? sanitizeManagedPluginName(bundle.pluginName) : undefined
-  const openCodePaths = resolveOpenCodePaths(outputRoot, pluginName)
+  const openCodePaths = resolveOpenCodePaths(outputRoot, pluginName, scope)
   const manifest = pluginName
     ? await readManagedInstallManifestWithLegacyFallback(openCodePaths.managedDir, pluginName)
     : null
@@ -143,14 +147,18 @@ export async function writeOpenCodeBundle(outputRoot: string, bundle: OpenCodeBu
   }
 }
 
-function resolveOpenCodePaths(outputRoot: string, pluginName?: string) {
+function resolveOpenCodePaths(outputRoot: string, pluginName?: string, scope?: string) {
   // Namespace the managed install directory per plugin so multiple plugins
   // installed into the same OpenCode root do not share (and overwrite) each
   // other's install manifests. `resolveManagedSegment` falls back to the
   // legacy "compound-engineering" segment when no plugin name is supplied.
   const managedSegment = resolveManagedSegment(pluginName)
   const base = path.basename(outputRoot)
-  if (base === "opencode" || base === ".opencode") {
+  // Global layout: explicit scope="global" (from OPENCODE_CONFIG_DIR or the XDG
+  // default), or a basename that matches OpenCode's conventional roots.
+  // Project layout: nested under ".opencode/".
+  const isGlobal = scope === "global" || base === "opencode" || base === ".opencode"
+  if (isGlobal) {
     return {
       root: outputRoot,
       managedDir: path.join(outputRoot, managedSegment),

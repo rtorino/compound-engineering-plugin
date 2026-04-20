@@ -86,7 +86,7 @@ export default defineCommand({
 
     try {
       const plugin = await loadClaudePlugin(resolvedPlugin.path)
-      const outputRoot = resolveOutputRoot(args.output)
+      const { root: outputRoot, isOpenCodeGlobalRoot } = resolveOutputRoot(args.output)
       const codexHome = resolveTargetHome(args.codexHome, path.join(os.homedir(), ".codex"))
       const piHome = resolveTargetHome(args.piHome, path.join(os.homedir(), ".pi", "agent"))
       const hasExplicitOutput = Boolean(args.output && String(args.output).trim())
@@ -134,7 +134,8 @@ export default defineCommand({
             pluginName: plugin.manifest.name,
             hasExplicitOutput,
           })
-          await handler.write(root, bundle)
+          const writeScope = tool.name === "opencode" && isOpenCodeGlobalRoot ? "global" : undefined
+          await handler.write(root, bundle, writeScope)
           console.log(`Installed ${plugin.manifest.name} to ${tool.name} at ${root}`)
         }
 
@@ -167,7 +168,11 @@ export default defineCommand({
         hasExplicitOutput,
         scope: resolvedScope,
       })
-      await target.write(primaryOutputRoot, bundle, resolvedScope)
+      const effectiveScope =
+        targetName === "opencode" && isOpenCodeGlobalRoot && resolvedScope === undefined
+          ? "global"
+          : resolvedScope
+      await target.write(primaryOutputRoot, bundle, effectiveScope)
       console.log(`Installed ${plugin.manifest.name} to ${primaryOutputRoot}`)
 
       const extraTargets = parseExtraTargets(args.also)
@@ -245,14 +250,19 @@ function parseExtraTargets(value: unknown): string[] {
     .filter(Boolean)
 }
 
-function resolveOutputRoot(value: unknown): string {
+function resolveOutputRoot(value: unknown): { root: string; isOpenCodeGlobalRoot: boolean } {
   if (value && String(value).trim()) {
     const expanded = expandHome(String(value).trim())
-    return path.resolve(expanded)
+    return { root: path.resolve(expanded), isOpenCodeGlobalRoot: false }
   }
-  // OpenCode global config lives at ~/.config/opencode per XDG spec
-  // See: https://opencode.ai/docs/config/
-  return path.join(os.homedir(), ".config", "opencode")
+  // OpenCode global config: respect OPENCODE_CONFIG_DIR if set (NixOS, Docker,
+  // non-default XDG_CONFIG_HOME), otherwise fall back to ~/.config/opencode
+  // per the XDG spec. See: https://opencode.ai/docs/config/
+  const envDir = process.env.OPENCODE_CONFIG_DIR?.trim()
+  if (envDir) {
+    return { root: path.resolve(expandHome(envDir)), isOpenCodeGlobalRoot: true }
+  }
+  return { root: path.join(os.homedir(), ".config", "opencode"), isOpenCodeGlobalRoot: true }
 }
 
 async function resolveBundledPluginPath(pluginName: string): Promise<string | null> {

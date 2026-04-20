@@ -93,6 +93,32 @@ describe("writeOpenCodeBundle", () => {
     expect(await exists(path.join(outputRoot, ".opencode"))).toBe(false)
   })
 
+  test("scope='global' forces flat layout for OPENCODE_CONFIG_DIR-style roots with non-conventional basenames", async () => {
+    // Simulates OPENCODE_CONFIG_DIR pointing to a directory whose basename is
+    // neither "opencode" nor ".opencode" (e.g. NixOS, Docker, custom XDG_CONFIG_HOME).
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-env-dir-"))
+    const outputRoot = path.join(tempRoot, "custom-opencode-config")
+    const bundle: OpenCodeBundle = {
+      config: { $schema: "https://opencode.ai/config.json" },
+      agents: [{ name: "agent-one", content: "Agent content" }],
+      plugins: [],
+      commandFiles: [],
+      skillDirs: [
+        {
+          name: "skill-one",
+          sourceDir: path.join(import.meta.dir, "fixtures", "sample-plugin", "skills", "skill-one"),
+        },
+      ],
+    }
+
+    await writeOpenCodeBundle(outputRoot, bundle, "global")
+
+    expect(await exists(path.join(outputRoot, "opencode.json"))).toBe(true)
+    expect(await exists(path.join(outputRoot, "agents", "agent-one.md"))).toBe(true)
+    expect(await exists(path.join(outputRoot, "skills", "skill-one", "SKILL.md"))).toBe(true)
+    expect(await exists(path.join(outputRoot, ".opencode"))).toBe(false)
+  })
+
   test("merges plugin config into existing opencode.json without destroying user keys", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-backup-"))
     const outputRoot = path.join(tempRoot, ".opencode")
