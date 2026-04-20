@@ -252,6 +252,11 @@ async function cleanupCodex(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>
     agentMode: "subagent",
     inferTemperature: true,
     permissions: "none",
+    // Cleanup needs the FULL bundle (skills, command-skills, agents) to know
+    // what's "current" vs "legacy." The agents-only default of `--to codex`
+    // is wrong here; it would make cleanup think every existing skill is
+    // legacy and remove them.
+    codexIncludeSkills: true,
   })
   const artifacts = getLegacyCodexArtifacts(bundle)
   const currentNamespacedSkills = new Set([
@@ -336,6 +341,9 @@ async function cleanupCodexSharedAgents(
     agentMode: "subagent",
     inferTemperature: true,
     permissions: "none",
+    // Same reason as cleanupCodex: cleanup needs the full bundle to make
+    // current-vs-legacy decisions correctly.
+    codexIncludeSkills: true,
   })
   const artifacts = getLegacyCodexArtifacts(bundle)
   const managedDir = path.join(agentsRoot, "compound-engineering")

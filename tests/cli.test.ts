@@ -1852,7 +1852,11 @@ describe("CLI", () => {
     expect(stdout).not.toContain("cursor")
 
     expect(await exists(path.join(tempHome, ".config", "opencode", "opencode.json"))).toBe(true)
-    expect(await exists(path.join(tempHome, ".codex", "skills", "compound-engineering", "skill-one", "SKILL.md"))).toBe(true)
+    // Codex `--to all` install uses the agents-only default — skills come from
+    // `codex plugin install`, not the Bun converter. Verify agents landed
+    // (the gap the converter fills) rather than skills (which the default suppresses).
+    expect(await exists(path.join(tempHome, ".codex", "agents", "compound-engineering", "security-sentinel.toml"))).toBe(true)
+    expect(await exists(path.join(tempHome, ".codex", "skills", "compound-engineering", "skill-one", "SKILL.md"))).toBe(false)
     expect(await exists(path.join(tempHome, ".pi", "agent", "skills", "skill-one", "SKILL.md"))).toBe(true)
     expect(await exists(path.join(tempCwd, ".gemini", "skills", "skill-one", "SKILL.md"))).toBe(true)
     expect(await exists(path.join(tempCwd, ".kiro", "skills", "skill-one", "SKILL.md"))).toBe(true)
