@@ -17,7 +17,7 @@ The block below is the literal file to write (minus this line and the fences). R
 ~~~markdown
 # {{product_name}} Strategy
 
-_Last updated: {{YYYY-MM-DD}}. Re-run `/ce:strategy` to update._
+_Last updated: {{YYYY-MM-DD}}. Re-run `/ce-strategy` to update._
 
 ## Target problem
 

@@ -1,12 +1,12 @@
 ---
-name: ce:product-pulse
+name: ce-product-pulse
 description: "Generate a time-windowed pulse report on what users experienced and how the product performed - usage, quality, errors, signals worth investigating. Use when the user says 'run a pulse', 'show me the pulse', 'how are we doing', 'weekly recap', 'launch-day check', or passes a time window like '24h' or '7d'. Produces a single-page report saved to ~/pulse-reports/ and summarized in chat."
 argument-hint: "[lookback window, e.g. '24h', '7d', '1h'; default 24h]"
 ---
 
 # Product Pulse
 
-`ce:product-pulse` queries the product's data sources for a given time window and produces a compact, single-page report covering usage, performance, errors, and followups. The report is saved to `~/pulse-reports/` and the key points are surfaced in chat.
+`ce-product-pulse` queries the product's data sources for a given time window and produces a compact, single-page report covering usage, performance, errors, and followups. The report is saved to `~/pulse-reports/` and the key points are surfaced in chat.
 
 This is a read-only skill. It reports on what happened; it does not fix anything, ship anything, or change the product.
 
@@ -62,7 +62,7 @@ Before asking any questions, read `docs/strategy.md` using the native file-read 
 
 Open the interview by showing the user what was pulled forward: "I see you have a strategy doc on file - I'll seed the product name as `{{name}}` and carry these key metrics into the event/data setup: {{metric list}}. Say so if any of that needs to change."
 
-If `docs/strategy.md` does not exist, note that too: "No strategy doc on file. Running the full setup from scratch. (If you want strategy to seed this later, run `/ce:strategy` first.)"
+If `docs/strategy.md` does not exist, note that too: "No strategy doc on file. Running the full setup from scratch. (If you want strategy to seed this later, run `/ce-strategy` first.)"
 
 #### 1.1 Interview
 

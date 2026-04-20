@@ -227,7 +227,7 @@ After the interview completes, write `docs/product-pulse.md` using this structur
 ~~~markdown
 # {{product_name}} Pulse Config
 
-_Last updated: {{YYYY-MM-DD}}. Re-run `/ce:product-pulse setup` to edit._
+_Last updated: {{YYYY-MM-DD}}. Re-run `/ce-product-pulse setup` to edit._
 
 ## Events
 

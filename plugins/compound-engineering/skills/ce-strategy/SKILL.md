@@ -1,5 +1,5 @@
 ---
-name: ce:strategy
+name: ce-strategy
 description: "Create or maintain docs/strategy.md - the product's target problem, approach, users, key metrics, and tracks of work. Use when starting a new product, updating direction, or when prompts like 'write our strategy', 'update the roadmap', 'what are we working on', or 'set up the strategy doc' come up. Also triggers when ce:ideate, ce:brainstorm, or ce:plan need upstream grounding and no strategy doc exists yet."
 argument-hint: "[optional: section to revisit, e.g. 'metrics' or 'approach']"
 ---
@@ -8,7 +8,7 @@ argument-hint: "[optional: section to revisit, e.g. 'metrics' or 'approach']"
 
 **Note: The current year is 2026.** Use this when dating the strategy document.
 
-`ce:strategy` produces and maintains `docs/strategy.md` - a short, durable anchor document that captures what the product is, who it serves, how it succeeds, and where the team is investing. Downstream skills (`ce:ideate`, `ce:brainstorm`, `ce:plan`) read it as grounding when it exists.
+`ce-strategy` produces and maintains `docs/strategy.md` - a short, durable anchor document that captures what the product is, who it serves, how it succeeds, and where the team is investing. Downstream skills (`ce:ideate`, `ce:brainstorm`, `ce:plan`) read it as grounding when it exists.
 
 The document is short and structured on purpose. Good answers to a handful of sharp questions produce a better strategy than any amount of prose. This skill asks those questions, pushes back on weak answers, and writes the doc.
 
