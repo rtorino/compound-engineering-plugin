@@ -58,6 +58,9 @@ query FetchPRFeedback($owner: String!, $repo: String!, $pr: Int!) {
             isOutdated
             path
             line
+            originalLine
+            startLine
+            originalStartLine
             comments(first: 10) {
               nodes {
                 id

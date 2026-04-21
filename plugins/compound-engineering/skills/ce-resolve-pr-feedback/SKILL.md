@@ -147,7 +147,7 @@ Previously-resolved threads (from `cross_invocation.resolved_threads`) participa
 
 Each agent receives:
 - The thread ID
-- The file path and line number
+- The file path and location fields: `line`, `originalLine`, `startLine`, `originalStartLine` (any can be null; outdated and file-level threads often have `line == null` and must fall back to `originalLine`)
 - The full comment text (all comments in the thread)
 - The PR number (for context)
 - The feedback type (`review_thread`)
@@ -376,7 +376,7 @@ This fetches thread IDs and their first comment IDs (minimal fields, no bodies) 
 
 ### 2. Fix, Reply, Resolve
 
-Spawn a single `workflow:ce-pr-comment-resolver` agent for the thread. Then follow the same validate -> commit -> push -> reply -> resolve flow as Full Mode steps 6-8.
+Spawn a single `workflow:ce-pr-comment-resolver` agent for the thread. Pass the same fields full mode does, including `isOutdated` and the location fields (`line`, `originalLine`, `startLine`, `originalStartLine`) -- targeted threads can be outdated too and need the same relocation handling. Then follow the same validate -> commit -> push -> reply -> resolve flow as Full Mode steps 6-8.
 
 ---
 
