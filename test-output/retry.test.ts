@@ -29,7 +29,7 @@ describe("retry", () => {
       throw new Error("single failure");
     };
 
-    expect(retry(fn, 1)).rejects.toThrow("single failure");
+    await expect(retry(fn, 1)).rejects.toThrow("single failure");
   });
 
   test("throws the last error when all attempts fail", async () => {
@@ -39,8 +39,8 @@ describe("retry", () => {
       throw new Error(`failure ${attempts}`);
     };
 
-    expect(retry(fn, 3)).rejects.toThrow("failure 3");
-    expect(retry(fn, 3)).rejects.not.toThrow("failure 1");
+    const error = await retry(fn, 3).catch((e: Error) => e);
+    expect(error.message).toBe("failure 3");
   });
 
   test("returns result when function completes within timeout", async () => {
@@ -52,9 +52,9 @@ describe("retry", () => {
   });
 
   test("throws timeout error when function exceeds timeout", async () => {
-    const fn = () => new Promise((resolve) => setTimeout(() => resolve("slow"), 200));
+    const fn = () => new Promise((resolve) => setTimeout(() => resolve("slow"), 5000));
 
-    await expect(retry(fn, 3, { timeoutMs: 50 })).rejects.toThrow("Retry timed out after 50ms");
+    await expect(retry(fn, 3, { timeoutMs: 10 })).rejects.toThrow("Retry timed out after 10ms");
   });
 
   test("timeout of 0 behaves as no timeout", async () => {
