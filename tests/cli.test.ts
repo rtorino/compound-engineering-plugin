@@ -1444,6 +1444,67 @@ describe("CLI", () => {
     expect(await exists(path.join(customRoot, "compound-engineering", "legacy-backup"))).toBe(true)
   })
 
+  test("cleanup --target opencode --output <workspace> scans workspace .opencode", async () => {
+    // Mirror install: `install --to opencode --output <workspace>` writes
+    // managed artifacts under `<workspace>/.opencode`. Cleanup must scan the
+    // same workspace directory (and must NOT touch the global root) when
+    // `--output` is supplied without an explicit `--opencode-home`.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-opencode-output-"))
+    const workspace = path.join(tempRoot, "workspace")
+    const workspaceOpenCode = path.join(workspace, ".opencode")
+    const globalRoot = path.join(tempRoot, "global-opencode")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    // Stale artifacts in the workspace install — these must be cleaned up.
+    await fs.mkdir(path.join(workspaceOpenCode, "skills", "creating-agent-skills"), { recursive: true })
+    await fs.writeFile(path.join(workspaceOpenCode, "skills", "creating-agent-skills", "SKILL.md"), "legacy deleted skill")
+    await fs.mkdir(path.join(workspaceOpenCode, "agents"), { recursive: true })
+    await fs.writeFile(path.join(workspaceOpenCode, "agents", "bug-reproduction-validator.md"), "legacy deleted agent")
+
+    // A lookalike stale artifact in the global root — this must be UNTOUCHED
+    // because the user scoped the cleanup to the workspace via `--output`.
+    await fs.mkdir(path.join(globalRoot, "skills", "creating-agent-skills"), { recursive: true })
+    await fs.writeFile(path.join(globalRoot, "skills", "creating-agent-skills", "SKILL.md"), "global stale skill")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "opencode",
+      "--output",
+      workspace,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+        OPENCODE_CONFIG_DIR: globalRoot,
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(stdout).toContain("Cleaned opencode")
+    expect(stdout).toContain(workspaceOpenCode)
+    // Workspace install stale artifacts cleaned.
+    expect(await exists(path.join(workspaceOpenCode, "skills", "creating-agent-skills"))).toBe(false)
+    expect(await exists(path.join(workspaceOpenCode, "agents", "bug-reproduction-validator.md"))).toBe(false)
+    expect(await exists(path.join(workspaceOpenCode, "compound-engineering", "legacy-backup"))).toBe(true)
+    // Global root must NOT be swept — `--output` scoped the cleanup.
+    expect(await exists(path.join(globalRoot, "skills", "creating-agent-skills"))).toBe(true)
+    expect(stdout).not.toContain(globalRoot)
+  })
+
   test("convert supports --pi-home for pi output", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-pi-home-"))
     const piRoot = path.join(tempRoot, ".pi")

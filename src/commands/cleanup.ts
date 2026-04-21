@@ -118,6 +118,7 @@ export default defineCommand({
     const targetNames = resolveCleanupTargets(String(args.target))
     const outputRoot = resolveWorkspaceRoot(args.output)
     const hasExplicitGeminiHome = hasExplicitValue(args.geminiHome)
+    const hasExplicitOpenCodeHome = hasExplicitValue(args.opencodeHome)
     const roots = {
       codexHome: resolveTargetHome(args.codexHome, path.join(os.homedir(), ".codex")),
       piHome: resolveTargetHome(args.piHome, path.join(os.homedir(), ".pi", "agent")),
@@ -134,6 +135,7 @@ export default defineCommand({
       workspaceRoot: outputRoot,
       hasExplicitOutput: hasExplicitValue(args.output),
       hasExplicitGeminiHome,
+      hasExplicitOpenCodeHome,
     }
 
     const results: CleanupResult[] = []
@@ -166,6 +168,7 @@ async function cleanupTarget(
     workspaceRoot: string
     hasExplicitOutput: boolean
     hasExplicitGeminiHome: boolean
+    hasExplicitOpenCodeHome: boolean
   },
 ): Promise<CleanupResult[]> {
   switch (target) {
@@ -174,8 +177,22 @@ async function cleanupTarget(
         await cleanupCodex(plugin, roots.codexHome),
         await cleanupCodexSharedAgents(plugin, roots.agentsHome),
       ]
-    case "opencode":
+    case "opencode": {
+      // Mirror install: when `--output <workspace>` is passed (without an
+      // explicit `--opencode-home`), install writes managed artifacts under
+      // `<workspace>/.opencode/{agents,skills,commands,plugins}`. Cleanup must
+      // scan the same directory or stale workspace artifacts get left behind.
+      // An explicit `--opencode-home` remains authoritative so users can still
+      // target a specific global-style root. When neither is set, fall back to
+      // the OpenCode global root (OPENCODE_CONFIG_DIR / XDG default).
+      if (roots.hasExplicitOpenCodeHome) {
+        return [await cleanupOpenCode(plugin, roots.opencodeHome)]
+      }
+      if (roots.hasExplicitOutput) {
+        return [await cleanupOpenCode(plugin, resolveOpenCodeWorkspaceRoot(roots.workspaceRoot))]
+      }
       return [await cleanupOpenCode(plugin, roots.opencodeHome)]
+    }
     case "pi":
       return [await cleanupPi(plugin, roots.piHome)]
     case "gemini": {
@@ -600,6 +617,10 @@ function resolveCopilotWorkspaceRoot(outputRoot: string): string {
 
 function resolveGeminiWorkspaceRoot(outputRoot: string): string {
   return path.basename(outputRoot) === ".gemini" ? outputRoot : path.join(outputRoot, ".gemini")
+}
+
+function resolveOpenCodeWorkspaceRoot(outputRoot: string): string {
+  return path.basename(outputRoot) === ".opencode" ? outputRoot : path.join(outputRoot, ".opencode")
 }
 
 function hasExplicitValue(value: unknown): boolean {

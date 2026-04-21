@@ -10,6 +10,12 @@ import {
   cleanupRemovedManagedFiles,
 } from "../src/targets/managed-artifacts"
 import { readCodexInstallManifest } from "../src/targets/codex"
+import {
+  cleanupRemovedPiExtensions,
+  cleanupRemovedPiPrompts,
+  cleanupRemovedPiSkills,
+  readPiInstallManifest,
+} from "../src/targets/pi"
 
 describe("isSafeManagedPath", () => {
   const root = "/tmp/managed-root"
@@ -239,5 +245,179 @@ describe("readCodexInstallManifest filters unsafe entries", () => {
     expect(result!.skills).toEqual(["a", "b", "c"])
     expect(result!.prompts).toEqual(["p.md"])
     expect(result!.agents).toEqual(["agent.toml"])
+  })
+})
+
+describe("readPiInstallManifest filters unsafe entries", () => {
+  let tempRoot: string
+
+  beforeEach(async () => {
+    tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "pi-manifest-"))
+  })
+
+  afterEach(async () => {
+    await fs.rm(tempRoot, { recursive: true, force: true })
+  })
+
+  test("drops traversal/absolute entries from skills, prompts, extensions", async () => {
+    const piRoot = path.join(tempRoot, ".pi")
+    const managedDir = path.join(piRoot, "compound-engineering")
+    await fs.mkdir(managedDir, { recursive: true })
+    const paths = {
+      managedDir,
+      skillsDir: path.join(piRoot, "skills"),
+      promptsDir: path.join(piRoot, "prompts"),
+      extensionsDir: path.join(piRoot, "extensions"),
+      mcporterConfigPath: path.join(managedDir, "mcporter.json"),
+      agentsPath: path.join(piRoot, "AGENTS.md"),
+    }
+    const manifest = {
+      version: 1,
+      pluginName: "compound-engineering",
+      skills: ["safe-skill", "../../../etc/passwd", "/etc/passwd", "foo/../../escape"],
+      prompts: ["ok.md", "../../evil.md", "foo/../bar.md"],
+      extensions: ["safe.ext", "/tmp/abs.ext", "..\\escape.ext"],
+    }
+    await fs.writeFile(path.join(managedDir, "install-manifest.json"), JSON.stringify(manifest))
+
+    const result = await readPiInstallManifest(managedDir, "compound-engineering", paths)
+    expect(result).not.toBeNull()
+    expect(result!.skills).toEqual(["safe-skill"])
+    expect(result!.prompts).toEqual(["ok.md"])
+    expect(result!.extensions).toEqual(["safe.ext"])
+  })
+
+  test("keeps all entries when all are safe", async () => {
+    const piRoot = path.join(tempRoot, ".pi")
+    const managedDir = path.join(piRoot, "compound-engineering")
+    await fs.mkdir(managedDir, { recursive: true })
+    const paths = {
+      managedDir,
+      skillsDir: path.join(piRoot, "skills"),
+      promptsDir: path.join(piRoot, "prompts"),
+      extensionsDir: path.join(piRoot, "extensions"),
+      mcporterConfigPath: path.join(managedDir, "mcporter.json"),
+      agentsPath: path.join(piRoot, "AGENTS.md"),
+    }
+    const manifest = {
+      version: 1,
+      pluginName: "compound-engineering",
+      skills: ["a", "b", "c"],
+      prompts: ["p.md"],
+      extensions: ["ext.js"],
+    }
+    await fs.writeFile(path.join(managedDir, "install-manifest.json"), JSON.stringify(manifest))
+
+    const result = await readPiInstallManifest(managedDir, "compound-engineering", paths)
+    expect(result).not.toBeNull()
+    expect(result!.skills).toEqual(["a", "b", "c"])
+    expect(result!.prompts).toEqual(["p.md"])
+    expect(result!.extensions).toEqual(["ext.js"])
+  })
+})
+
+describe("Pi cleanup helpers do not escape root (defense in depth)", () => {
+  let tempRoot: string
+
+  beforeEach(async () => {
+    tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "pi-cleanup-"))
+  })
+
+  afterEach(async () => {
+    await fs.rm(tempRoot, { recursive: true, force: true })
+  })
+
+  test("cleanupRemovedPiSkills skips unsafe entries fed directly", async () => {
+    const skillsDir = path.join(tempRoot, "skills")
+    await fs.mkdir(skillsDir, { recursive: true })
+    const outsideDir = path.join(tempRoot, "outside-skill")
+    await fs.mkdir(outsideDir)
+    await fs.writeFile(path.join(outsideDir, "file.txt"), "keep me")
+
+    const hostileManifest = {
+      version: 1 as const,
+      pluginName: "compound-engineering",
+      skills: ["../outside-skill", "/etc/passwd"],
+      prompts: [],
+      extensions: [],
+    }
+
+    await cleanupRemovedPiSkills(skillsDir, hostileManifest, [])
+    expect(await fs.readFile(path.join(outsideDir, "file.txt"), "utf8")).toBe("keep me")
+  })
+
+  test("cleanupRemovedPiPrompts skips unsafe entries fed directly", async () => {
+    const promptsDir = path.join(tempRoot, "prompts")
+    await fs.mkdir(promptsDir, { recursive: true })
+    const outsideFile = path.join(tempRoot, "outside.txt")
+    await fs.writeFile(outsideFile, "keep me")
+
+    const hostileManifest = {
+      version: 1 as const,
+      pluginName: "compound-engineering",
+      skills: [],
+      prompts: ["../outside.txt", "/etc/passwd"],
+      extensions: [],
+    }
+
+    await cleanupRemovedPiPrompts(promptsDir, hostileManifest, [])
+    expect(await fs.readFile(outsideFile, "utf8")).toBe("keep me")
+  })
+
+  test("cleanupRemovedPiExtensions skips unsafe entries fed directly", async () => {
+    const extensionsDir = path.join(tempRoot, "extensions")
+    await fs.mkdir(extensionsDir, { recursive: true })
+    const outsideFile = path.join(tempRoot, "outside-ext")
+    await fs.writeFile(outsideFile, "keep me")
+
+    const hostileManifest = {
+      version: 1 as const,
+      pluginName: "compound-engineering",
+      skills: [],
+      prompts: [],
+      extensions: ["../outside-ext", "/etc/passwd", "foo/../../escape"],
+    }
+
+    await cleanupRemovedPiExtensions(extensionsDir, hostileManifest, [])
+    expect(await fs.readFile(outsideFile, "utf8")).toBe("keep me")
+  })
+
+  test("still cleans up safe entries correctly", async () => {
+    const skillsDir = path.join(tempRoot, "skills")
+    const promptsDir = path.join(tempRoot, "prompts")
+    const extensionsDir = path.join(tempRoot, "extensions")
+    await fs.mkdir(skillsDir, { recursive: true })
+    await fs.mkdir(promptsDir, { recursive: true })
+    await fs.mkdir(extensionsDir, { recursive: true })
+
+    const staleSkillDir = path.join(skillsDir, "stale-skill")
+    await fs.mkdir(staleSkillDir)
+    await fs.writeFile(path.join(staleSkillDir, "SKILL.md"), "old")
+    const stalePrompt = path.join(promptsDir, "stale.md")
+    await fs.writeFile(stalePrompt, "old")
+    const staleExt = path.join(extensionsDir, "stale.ext")
+    await fs.writeFile(staleExt, "old")
+
+    const manifest = {
+      version: 1 as const,
+      pluginName: "compound-engineering",
+      skills: ["stale-skill"],
+      prompts: ["stale.md"],
+      extensions: ["stale.ext"],
+    }
+
+    await cleanupRemovedPiSkills(skillsDir, manifest, [])
+    await cleanupRemovedPiPrompts(promptsDir, manifest, [])
+    await cleanupRemovedPiExtensions(extensionsDir, manifest, [])
+
+    for (const p of [staleSkillDir, stalePrompt, staleExt]) {
+      let exists = true
+      try {
+        await fs.stat(p)
+      } catch {
+        exists = false
+      }
+      expect(exists).toBe(false)
+    }
   })
 })

@@ -4,6 +4,7 @@ import {
   backupFile,
   copySkillDir,
   ensureDir,
+  isSafeManagedPath,
   pathExists,
   readText,
   sanitizePathName,
@@ -32,7 +33,7 @@ Compatibility notes:
 - MCPorter config path: .pi/compound-engineering/mcporter.json (project) or ~/.pi/agent/compound-engineering/mcporter.json (global)
 `
 
-type PiInstallManifest = {
+export type PiInstallManifest = {
   version: 1
   pluginName: string
   skills: string[]
@@ -53,7 +54,7 @@ export async function writePiBundle(outputRoot: string, bundle: PiBundle): Promi
   const pluginName = bundle.pluginName ? sanitizeCodexPathComponent(bundle.pluginName) : undefined
   const paths = resolvePiPaths(outputRoot, pluginName)
   const manifest = pluginName
-    ? await readInstallManifestWithLegacyFallback(paths.managedDir, pluginName)
+    ? await readInstallManifestWithLegacyFallback(paths, pluginName)
     : null
   const currentPrompts = bundle.prompts.map((prompt) => `${sanitizePathName(prompt.name)}.md`)
   const currentSkills = [
@@ -196,15 +197,23 @@ function sanitizeCodexPathComponent(name: string): string {
   return sanitizePathName(name).replace(/[\\/]/g, "-")
 }
 
-async function readInstallManifestWithLegacyFallback(
+export async function readPiInstallManifest(
   managedDir: string,
   pluginName: string,
+  paths?: PiPaths,
 ): Promise<PiInstallManifest | null> {
-  const current = await readInstallManifest(managedDir, pluginName)
+  return readInstallManifest(managedDir, pluginName, paths)
+}
+
+async function readInstallManifestWithLegacyFallback(
+  paths: PiPaths,
+  pluginName: string,
+): Promise<PiInstallManifest | null> {
+  const current = await readInstallManifest(paths.managedDir, pluginName, paths)
   if (current) return current
-  const legacyDir = resolveLegacyManagedDir(managedDir, pluginName)
+  const legacyDir = resolveLegacyManagedDir(paths.managedDir, pluginName)
   if (!legacyDir) return null
-  return readInstallManifest(legacyDir, pluginName)
+  return readInstallManifest(legacyDir, pluginName, paths)
 }
 
 /**
@@ -233,7 +242,11 @@ async function archiveLegacyInstallManifestIfOwned(
   console.warn(`Moved legacy Pi install manifest to ${backupPath}`)
 }
 
-async function readInstallManifest(managedDir: string, pluginName: string): Promise<PiInstallManifest | null> {
+async function readInstallManifest(
+  managedDir: string,
+  pluginName: string,
+  paths?: PiPaths,
+): Promise<PiInstallManifest | null> {
   const manifestPath = path.join(managedDir, PI_INSTALL_MANIFEST)
   try {
     const raw = await readText(manifestPath)
@@ -245,7 +258,25 @@ async function readInstallManifest(managedDir: string, pluginName: string): Prom
       Array.isArray(parsed.prompts) &&
       Array.isArray(parsed.extensions)
     ) {
-      return parsed as PiInstallManifest
+      // Filter manifest entries at read time. Cleanup functions join these
+      // strings into `fs.rm` paths against the Pi skills/prompts/extensions
+      // directories, so a tampered or corrupted `install-manifest.json` with
+      // entries like `../../config.toml` or `/etc/passwd` would otherwise
+      // delete outside the Pi managed tree. Validate each group against the
+      // specific cleanup root it will be joined with; fall back to
+      // `managedDir` when no `PiPaths` context is supplied (e.g. an
+      // ownership-only read), which still rejects absolute paths and `..`
+      // segments and provides containment against *some* root.
+      const skillsRoot = paths?.skillsDir ?? managedDir
+      const promptsRoot = paths?.promptsDir ?? managedDir
+      const extensionsRoot = paths?.extensionsDir ?? managedDir
+      return {
+        version: 1,
+        pluginName,
+        skills: filterSafePiManifestEntries(parsed.skills, skillsRoot, manifestPath, "skills"),
+        prompts: filterSafePiManifestEntries(parsed.prompts, promptsRoot, manifestPath, "prompts"),
+        extensions: filterSafePiManifestEntries(parsed.extensions, extensionsRoot, manifestPath, "extensions"),
+      }
     }
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -253,6 +284,25 @@ async function readInstallManifest(managedDir: string, pluginName: string): Prom
     }
   }
   return null
+}
+
+function filterSafePiManifestEntries(
+  entries: unknown[],
+  rootDir: string,
+  manifestPath: string,
+  group: string,
+): string[] {
+  const safe: string[] = []
+  for (const entry of entries) {
+    if (isSafeManagedPath(rootDir, entry)) {
+      safe.push(entry)
+    } else {
+      console.warn(
+        `Dropping unsafe Pi install-manifest entry in ${manifestPath} (group "${group}"): ${JSON.stringify(entry)}`,
+      )
+    }
+  }
+  return safe
 }
 
 async function writeInstallManifest(managedDir: string, manifest: PiInstallManifest): Promise<void> {
@@ -267,9 +317,12 @@ async function cleanupRemovedSkills(
   if (!manifest) return
   const current = new Set(currentSkills)
   for (const skillName of manifest.skills) {
-    if (!current.has(skillName)) {
-      await fs.rm(path.join(skillsDir, skillName), { recursive: true, force: true })
-    }
+    if (current.has(skillName)) continue
+    // Defense in depth: `readInstallManifest` already drops unsafe entries,
+    // but re-check before any out-of-tree fs.rm can be issued from a future
+    // caller that bypasses the read layer.
+    if (!isSafeManagedPath(skillsDir, skillName)) continue
+    await fs.rm(path.join(skillsDir, skillName), { recursive: true, force: true })
   }
 }
 
@@ -281,9 +334,9 @@ async function cleanupRemovedPrompts(
   if (!manifest) return
   const current = new Set(currentPrompts)
   for (const promptFile of manifest.prompts) {
-    if (!current.has(promptFile)) {
-      await fs.rm(path.join(promptsDir, promptFile), { force: true })
-    }
+    if (current.has(promptFile)) continue
+    if (!isSafeManagedPath(promptsDir, promptFile)) continue
+    await fs.rm(path.join(promptsDir, promptFile), { force: true })
   }
 }
 
@@ -295,9 +348,9 @@ async function cleanupRemovedExtensions(
   if (!manifest) return
   const current = new Set(currentExtensions)
   for (const extensionFile of manifest.extensions) {
-    if (!current.has(extensionFile)) {
-      await fs.rm(path.join(extensionsDir, extensionFile), { force: true })
-    }
+    if (current.has(extensionFile)) continue
+    if (!isSafeManagedPath(extensionsDir, extensionFile)) continue
+    await fs.rm(path.join(extensionsDir, extensionFile), { force: true })
   }
 }
 
@@ -338,4 +391,10 @@ async function moveLegacyArtifactToBackup(
   await ensureDir(backupDir)
   await fs.rename(artifactPath, backupPath)
   console.warn(`Moved legacy Pi ${kind.slice(0, -1)} artifact to ${backupPath}`)
+}
+
+export {
+  cleanupRemovedSkills as cleanupRemovedPiSkills,
+  cleanupRemovedPrompts as cleanupRemovedPiPrompts,
+  cleanupRemovedExtensions as cleanupRemovedPiExtensions,
 }
