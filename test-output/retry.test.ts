@@ -42,4 +42,26 @@ describe("retry", () => {
     expect(retry(fn, 3)).rejects.toThrow("failure 3");
     expect(retry(fn, 3)).rejects.not.toThrow("failure 1");
   });
+
+  test("returns result when function completes within timeout", async () => {
+    const fn = () => "fast result";
+
+    const result = await retry(fn, 3, { timeoutMs: 1000 });
+
+    expect(result).toBe("fast result");
+  });
+
+  test("throws timeout error when function exceeds timeout", async () => {
+    const fn = () => new Promise((resolve) => setTimeout(() => resolve("slow"), 200));
+
+    await expect(retry(fn, 3, { timeoutMs: 50 })).rejects.toThrow("Retry timed out after 50ms");
+  });
+
+  test("timeout of 0 behaves as no timeout", async () => {
+    const fn = () => new Promise((resolve) => setTimeout(() => resolve("eventually"), 50));
+
+    const result = await retry(fn, 1, { timeoutMs: 0 });
+
+    expect(result).toBe("eventually");
+  });
 });
