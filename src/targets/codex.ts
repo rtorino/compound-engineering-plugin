@@ -49,10 +49,17 @@ export async function writeCodexBundle(outputRoot: string, bundle: CodexBundle):
   const skillsRoot = pluginName
     ? path.join(codexRoot, "skills", pluginName)
     : path.join(codexRoot, "skills")
-  const currentSkills = [
+  // Include `externallyManagedSkillNames` so agents-only installs (default
+  // `--to codex`) treat skills installed via Codex's native plugin flow as
+  // "current" for cleanup purposes. Without this, `cleanupLegacyAgentSkillDirs`
+  // would see an empty `currentSkills` set and sweep allow-listed names such
+  // as `ce-plan` out of `.codex/skills/<plugin>/` into legacy-backup on every
+  // re-run of `install --to codex`.
+  const currentSkills = Array.from(new Set([
     ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
     ...bundle.generatedSkills.map((skill) => sanitizePathName(skill.name)),
-  ]
+    ...(bundle.externallyManagedSkillNames ?? []).map((name) => sanitizePathName(name)),
+  ]))
   await cleanupRemovedSkills(skillsRoot, manifest, currentSkills)
 
   if (bundle.skillDirs.length > 0) {

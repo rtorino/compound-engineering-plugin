@@ -263,6 +263,25 @@ describe("release metadata", () => {
     ).toBe(true)
   })
 
+  test("reports missing skills field on Codex manifest as structural error", async () => {
+    const root = await makeFixtureRoot()
+    // Drop the `skills` field entirely from the coding-tutor Codex manifest.
+    await writeFile(
+      path.join(root, "plugins", "coding-tutor", ".codex-plugin", "plugin.json"),
+      JSON.stringify({ name: "coding-tutor", version: "1.2.1" }, null, 2),
+    )
+    const result = await syncReleaseMetadata({ root, write: false })
+
+    expect(
+      result.errors.some(
+        (err) =>
+          err.includes("coding-tutor") &&
+          err.includes("missing required field") &&
+          err.includes("skills"),
+      ),
+    ).toBe(true)
+  })
+
   test("reports missing skills directory when Codex manifest declares one", async () => {
     const root = await makeFixtureRoot()
     // Remove coding-tutor's skills dir but keep the skills declaration.

@@ -1,7 +1,7 @@
 import fs, { type Dirent } from "fs"
 import path from "path"
 import { formatFrontmatter } from "../utils/frontmatter"
-import { type ClaudeAgent, type ClaudeCommand, type ClaudePlugin, type ClaudeSkill, filterSkillsByPlatform } from "../types/claude"
+import { type ClaudeAgent, type ClaudeCommand, type ClaudePlugin, filterSkillsByPlatform } from "../types/claude"
 import type { CodexAgent, CodexBundle, CodexGeneratedSkill, CodexGeneratedSkillSidecarDir } from "../types/codex"
 import type { ClaudeToOpenCodeOptions } from "./claude-to-opencode"
 import {
@@ -77,6 +77,25 @@ export function convertClaudeToCodex(
     // Default: agents-only. Skills, prompts, command-skills, and MCP are
     // suppressed so native plugin install is the sole source for those
     // artifact types.
+    //
+    // Pass through current skill NAMES (not contents) so `writeCodexBundle`
+    // treats them as "current" and `cleanupLegacyAgentSkillDirs` doesn't
+    // move still-active skills under `.codex/skills/<plugin>/<name>/` into
+    // legacy-backup. Without this, re-running `install --to codex` after a
+    // native plugin install would sweep allow-listed names like `ce-plan`
+    // into backup because `currentSkills` (derived from skillDirs and
+    // generatedSkills) would be empty while the legacy allow-list still
+    // lists them.
+    // Mirror the skill-name set that full mode would emit via `skillDirs`:
+    // current skills plus the canonical rewrites of deprecated workflow
+    // aliases. Deduped via Set so the caller doesn't have to worry about
+    // overlap between `copiedSkills` names and `skillTargets` values.
+    const externallyManagedSkillNames = Array.from(new Set([
+      ...copiedSkills.map((skill) => skill.name),
+      ...deprecatedWorkflowAliases
+        .map((alias) => toCanonicalWorkflowSkillName(alias.name))
+        .filter((name): name is string => name !== null),
+    ]))
     return {
       pluginName: plugin.manifest.name,
       prompts: [],
@@ -85,6 +104,7 @@ export function convertClaudeToCodex(
       agents,
       invocationTargets,
       mcpServers: undefined,
+      externallyManagedSkillNames,
     }
   }
 

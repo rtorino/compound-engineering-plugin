@@ -354,6 +354,65 @@ describe("writeCodexBundle", () => {
     }
   })
 
+  test("agents-only install preserves namespaced skills previously installed via Codex native plugin flow", async () => {
+    // Regression for the bug where re-running `install --to codex` after a
+    // native `/plugins` install moved currently-active namespaced skills
+    // (e.g., `.codex/skills/compound-engineering/ce-plan/`) into
+    // legacy-backup. The agents-only default produces an empty `skillDirs` /
+    // `generatedSkills`, but the converter now populates
+    // `externallyManagedSkillNames` with the allow-listed current skills so
+    // `cleanupLegacyAgentSkillDirs` treats them as current rather than legacy.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-agents-only-preserve-"))
+    const codexRoot = path.join(tempRoot, ".codex")
+
+    // Simulate the tree produced by a native Codex plugin install: active
+    // namespaced skills under `.codex/skills/<plugin>/<skill>/SKILL.md`.
+    const namespacedSkillsRoot = path.join(codexRoot, "skills", "compound-engineering")
+    for (const skillName of ["ce-plan", "ce-debug", "ce-brainstorm"]) {
+      await fs.mkdir(path.join(namespacedSkillsRoot, skillName), { recursive: true })
+      await fs.writeFile(
+        path.join(namespacedSkillsRoot, skillName, "SKILL.md"),
+        `# ${skillName} skill installed via native Codex plugin flow`,
+      )
+    }
+
+    const plugin = await loadClaudePlugin(path.join(import.meta.dir, "..", "plugins", "compound-engineering"))
+    const bundle = convertClaudeToCodex(plugin, {
+      agentMode: "subagent",
+      inferTemperature: true,
+      permissions: "none",
+      // codexIncludeSkills omitted -> agents-only default
+    })
+
+    // Sanity: agents-only bundle does not request any skill writes, but it
+    // does advertise the current skill names so cleanup preserves them.
+    expect(bundle.skillDirs).toEqual([])
+    expect(bundle.generatedSkills).toEqual([])
+    expect(bundle.externallyManagedSkillNames).toContain("ce-plan")
+    expect(bundle.externallyManagedSkillNames).toContain("ce-debug")
+
+    await writeCodexBundle(codexRoot, bundle)
+
+    // Currently-active skills survive an agents-only re-install.
+    expect(await exists(path.join(namespacedSkillsRoot, "ce-plan", "SKILL.md"))).toBe(true)
+    expect(await exists(path.join(namespacedSkillsRoot, "ce-debug", "SKILL.md"))).toBe(true)
+    expect(await exists(path.join(namespacedSkillsRoot, "ce-brainstorm", "SKILL.md"))).toBe(true)
+
+    // And none of them were silently relocated into legacy-backup.
+    const backupRoot = path.join(codexRoot, "compound-engineering", "legacy-backup")
+    if (await exists(backupRoot)) {
+      const timestamps = await fs.readdir(backupRoot)
+      for (const ts of timestamps) {
+        const skillsBackup = path.join(backupRoot, ts, "skills")
+        if (!(await exists(skillsBackup))) continue
+        const backed = await fs.readdir(skillsBackup)
+        expect(backed).not.toContain("ce-plan")
+        expect(backed).not.toContain("ce-debug")
+        expect(backed).not.toContain("ce-brainstorm")
+      }
+    }
+  })
+
   test("preserves existing user config when writing MCP servers", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-backup-"))
     const codexRoot = path.join(tempRoot, ".codex")

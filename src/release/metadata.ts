@@ -312,8 +312,13 @@ export async function syncReleaseMetadata(options: SyncOptions = {}): Promise<Me
       codexChanged = true
     }
 
-    // Skills-dir existence: if declared, the directory must exist.
-    if (codex.skills) {
+    // Skills declaration: required. Codex native install is the source of
+    // skills for each plugin (and `--to codex` defaults to agents-only), so a
+    // missing `skills` field silently produces a broken install with no skills
+    // registered. Enforce presence, then verify the directory exists.
+    if (codex.skills === undefined) {
+      errors.push(`${codexPath} (${expectedName}): missing required field "skills". Codex plugins must declare a skills path (e.g., "./skills/").`)
+    } else {
       const pluginDir = path.dirname(path.dirname(codexPath))
       const skillsDir = path.resolve(pluginDir, codex.skills)
       try {
