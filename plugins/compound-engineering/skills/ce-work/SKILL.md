@@ -20,7 +20,10 @@ This command takes a work document (plan, specification, or todo file) or a bare
 
 ### Phase 0: Input Triage
 
-**Session state check:** Before anything else, check for `SESSION_STATE.md` in the project root. If it exists, read `references/session-state.md` for the state format and resume behavior. Offer to resume from the recorded state or start fresh. If the state is stale (>7 days) or references a different branch, flag it.
+**Session state check (MANDATORY — runs before input triage):**
+1. Run: check if `SESSION_STATE.md` exists in the project root (use Bash: `test -f SESSION_STATE.md && echo EXISTS || echo NONE`)
+2. If EXISTS: read `SESSION_STATE.md`, then read `references/session-state.md` for resume behavior. Present the state to the user and ask: "Found session state — resume from here, or start fresh?" Do NOT proceed to input triage until the user responds.
+3. If NONE: proceed to input triage below.
 
 Determine how to proceed based on what was provided in `<input_document>`.
 
