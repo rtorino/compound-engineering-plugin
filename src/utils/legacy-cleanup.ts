@@ -17,6 +17,7 @@ import fs from "fs/promises"
 import path from "path"
 import { fileURLToPath } from "url"
 import { parseFrontmatter } from "./frontmatter"
+import { sanitizePathName } from "./files"
 
 /** Old skill directory names that no longer exist after the v3 rename. */
 const STALE_SKILL_DIRS = [
@@ -707,4 +708,121 @@ export async function classifyCodexLegacyPromptOwnership(
   if (!hasFingerprint) return "unknown"
   const ceOwned = await isLegacyPromptWrapper(promptPath, prompts.get(fileName))
   return ceOwned ? "ce-owned" : "foreign"
+}
+
+/**
+ * Ownership verdict for a flat Codex skill directory at a shared path like
+ * `~/.codex/skills/<name>/`. Used by the Codex install path before moving an
+ * allow-listed flat skill dir into `compound-engineering/legacy-backup/`.
+ *
+ * `~/.codex/skills/` is a cross-plugin, cross-user-authored directory — a
+ * filename match against the historical allow-list is not a strong enough
+ * signal to relocate a directory. A user who creates their own
+ * `~/.codex/skills/ce-plan/` for their own workflow would otherwise see it
+ * swept into legacy-backup on every `install --to codex`.
+ *
+ * Verdicts mirror `classifyCodexLegacyPromptOwnership`:
+ *   - `"ce-owned"`: the directory contains a `SKILL.md` whose frontmatter
+ *     description matches a description CE has ever shipped for this flat name
+ *     (current or historical). Safe to move.
+ *   - `"foreign"`: we have at least one expected description on record for
+ *     this flat name (so CE has shipped this path before) and either the
+ *     `SKILL.md` is missing or its description does not match. A user or
+ *     sibling plugin authored this directory — leave it alone.
+ *   - `"unknown"`: we have no expected description on record for this flat
+ *     name. This applies to fully-retired flat skills whose corresponding
+ *     ce-* skill no longer ships and that are not listed in
+ *     `LEGACY_ONLY_SKILL_DESCRIPTIONS` or
+ *     `LEGACY_SKILL_DESCRIPTION_ALIASES`. User collisions at those names are
+ *     unlikely, and the historical allow-list was written specifically to
+ *     clean them up. Callers may fall back to name-only cleanup in this case.
+ *
+ * `flatSkillName` is the path segment (e.g. `ce-plan`, `git-commit`,
+ * `reproduce-bug`) — already sanitized, since flat Codex skill paths never
+ * contain raw colons on modern filesystems. Pass the raw directory name as
+ * given; this function handles the mapping to legacy fingerprints.
+ */
+export type CodexFlatSkillOwnership = "ce-owned" | "foreign" | "unknown"
+
+export async function classifyCodexLegacyFlatSkillOwnership(
+  flatSkillDir: string,
+  flatSkillName: string,
+): Promise<CodexFlatSkillOwnership> {
+  const acceptableDescriptions = await collectAcceptableFlatSkillDescriptions(flatSkillName)
+  if (acceptableDescriptions.length === 0) return "unknown"
+
+  const skillMdPath = path.join(flatSkillDir, "SKILL.md")
+  const actualDescription = await readDescription(skillMdPath)
+  if (actualDescription === null) {
+    // Dir exists (caller has checked) but has no readable SKILL.md /
+    // frontmatter. CE has always shipped a SKILL.md per skill dir, so absence
+    // is evidence the dir is not ours.
+    return "foreign"
+  }
+
+  for (const expected of acceptableDescriptions) {
+    if (descriptionsMatch(actualDescription, expected)) return "ce-owned"
+  }
+  return "foreign"
+}
+
+async function collectAcceptableFlatSkillDescriptions(flatSkillName: string): Promise<string[]> {
+  const { skills, agents } = await loadLegacyFingerprints()
+  const candidates = new Set<string>()
+  // Normalize the flat directory name for comparison: the Codex allow-list
+  // includes both sanitized (`ce-plan`) and raw-colon (`ce:plan`) variants of
+  // the same historical skill, so we fingerprint against the canonical
+  // sanitized form on both sides.
+  const sanitizedFlatName = sanitizePathName(flatSkillName)
+
+  // 1. The legacy-fingerprints `skills` map is keyed by STALE_SKILL_DIRS
+  // entries. Any legacy name whose sanitized form matches the flat path
+  // segment contributes its fingerprint (either the current-skill description
+  // or the hardcoded legacy-only description via `loadLegacyFingerprints`).
+  for (const [legacyName, description] of skills) {
+    if (sanitizePathName(legacyName) === sanitizedFlatName) {
+      candidates.add(description)
+    }
+  }
+
+  // 2. Some historical flat skill names came from the "agent-as-skill"
+  // conversion flow — the Codex allow-list adds agent names to the flat
+  // skills set. Include agent fingerprints under their sanitized name so an
+  // agent-authored flat skill at `~/.codex/skills/<agent-name>/` is
+  // fingerprinted against the agent's description.
+  for (const [legacyName, description] of agents) {
+    if (sanitizePathName(legacyName) === sanitizedFlatName) {
+      candidates.add(description)
+    }
+    // Agents were also shipped under their ce-<name> form once renamed.
+    if (`ce-${sanitizePathName(legacyName)}` === sanitizedFlatName) {
+      candidates.add(description)
+    }
+  }
+
+  // 3. Hardcoded historical skill-description aliases keyed by the flat
+  // directory name, for flat names whose current/historical descriptions are
+  // not captured by STALE_SKILL_DIRS lookups (e.g., `setup`).
+  for (const alias of LEGACY_SKILL_DESCRIPTION_ALIASES[sanitizedFlatName] ?? []) {
+    candidates.add(alias)
+  }
+
+  // 4. Legacy-only descriptions for names that never had a current ce-*
+  // replacement but are still present in the flat allow-list under their
+  // sanitized form (e.g., `reproduce-bug`, `orchestrating-swarms`).
+  for (const [legacyName, description] of Object.entries(LEGACY_ONLY_SKILL_DESCRIPTIONS)) {
+    if (sanitizePathName(legacyName) === sanitizedFlatName) {
+      candidates.add(description)
+    }
+  }
+  for (const [legacyName, description] of Object.entries(LEGACY_ONLY_AGENT_DESCRIPTIONS)) {
+    if (sanitizePathName(legacyName) === sanitizedFlatName) {
+      candidates.add(description)
+    }
+    if (`ce-${sanitizePathName(legacyName)}` === sanitizedFlatName) {
+      candidates.add(description)
+    }
+  }
+
+  return [...candidates]
 }

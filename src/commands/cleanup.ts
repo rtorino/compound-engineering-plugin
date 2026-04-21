@@ -107,7 +107,7 @@ export default defineCommand({
     agentsHome: {
       type: "string",
       alias: "agents-home",
-      description: "Shared .agents root to clean for shadowing skills (default: ~/.agents)",
+      description: "Shared .agents root to clean for shadowing skills (default: sibling of --codex-home, e.g. ~/.agents)",
     },
   },
   async run({ args }) {
@@ -120,8 +120,17 @@ export default defineCommand({
     const outputRoot = resolveWorkspaceRoot(args.output)
     const hasExplicitGeminiHome = hasExplicitValue(args.geminiHome)
     const hasExplicitOpenCodeHome = hasExplicitValue(args.opencodeHome)
+    const codexHome = resolveTargetHome(args.codexHome, path.join(os.homedir(), ".codex"))
+    // Mirror install-time derivation: `cleanupLegacyAgentsSkillSymlinks` in
+    // `src/targets/codex.ts` writes managed symlinks under
+    // `path.dirname(codexRoot)/.agents/skills`. If the user sets --codex-home
+    // outside $HOME but omits --agents-home, cleanup needs to scan the same
+    // sibling `.agents` tree install wrote to — defaulting to `~/.agents`
+    // would leave stale managed symlinks that keep shadowing skills.
+    // Explicit --agents-home still wins via resolveTargetHome's value check.
+    const agentsHomeDefault = path.join(path.dirname(codexHome), ".agents")
     const roots = {
-      codexHome: resolveTargetHome(args.codexHome, path.join(os.homedir(), ".codex")),
+      codexHome,
       piHome: resolveTargetHome(args.piHome, path.join(os.homedir(), ".pi", "agent")),
       // Mirror install: respect OPENCODE_CONFIG_DIR before falling back to the
       // XDG default so cleanup scans the same directory install wrote to.
@@ -132,7 +141,7 @@ export default defineCommand({
       droidHome: resolveTargetHome(args.droidHome, path.join(os.homedir(), ".factory")),
       qwenHome: resolveTargetHome(args.qwenHome, path.join(os.homedir(), ".qwen")),
       windsurfHome: resolveTargetHome(args.windsurfHome, path.join(os.homedir(), ".codeium", "windsurf")),
-      agentsHome: resolveTargetHome(args.agentsHome, path.join(os.homedir(), ".agents")),
+      agentsHome: resolveTargetHome(args.agentsHome, agentsHomeDefault),
       workspaceRoot: outputRoot,
       hasExplicitOutput: hasExplicitValue(args.output),
       hasExplicitGeminiHome,

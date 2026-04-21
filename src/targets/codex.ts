@@ -5,7 +5,7 @@ import type { CodexBundle } from "../types/codex"
 import type { ClaudeMcpServer } from "../types/claude"
 import { transformContentForCodex } from "../utils/codex-content"
 import { getLegacyCodexArtifacts } from "../data/plugin-legacy-artifacts"
-import { classifyCodexLegacyPromptOwnership } from "../utils/legacy-cleanup"
+import { classifyCodexLegacyFlatSkillOwnership, classifyCodexLegacyPromptOwnership } from "../utils/legacy-cleanup"
 
 const MANAGED_START_MARKER = "# BEGIN Compound Engineering plugin MCP -- do not edit this block"
 const MANAGED_END_MARKER = "# END Compound Engineering plugin MCP"
@@ -260,6 +260,18 @@ async function cleanupKnownLegacyCodexArtifacts(codexRoot: string, bundle: Codex
   const legacyArtifacts = getLegacyCodexArtifacts(bundle)
   for (const skillName of legacyArtifacts.skills) {
     const legacySkillPath = path.join(codexRoot, "skills", skillName)
+    // Ownership gate: `~/.codex/skills/` is a shared directory across plugins
+    // and user-authored skills. A filename match against the legacy allow-list
+    // is not a strong enough signal to relocate a whole skill directory — a
+    // user who creates `~/.codex/skills/ce-plan/` for their own workflow would
+    // otherwise see it swept into `compound-engineering/legacy-backup/` on
+    // every install. Mirror the SKILL.md frontmatter ownership check used by
+    // the prompt path above. "unknown" (no fingerprint on record, e.g. fully
+    // retired flat skills like `orchestrating-swarms`) falls through to the
+    // historical allow-list behavior — user collisions at those names are
+    // unlikely and a strict gate would strand genuinely-owned orphans.
+    const ownership = await classifyCodexLegacyFlatSkillOwnership(legacySkillPath, skillName)
+    if (ownership === "foreign") continue
     await moveLegacyArtifactToBackup(codexRoot, pluginName, "skills", legacySkillPath)
   }
 

@@ -302,6 +302,62 @@ describe("CLI", () => {
     expect(await fs.readFile(path.join(userPlainDir, "SKILL.md"), "utf8")).toBe(userPlainContent)
   })
 
+  test("cleanup --target codex defaults agents-home to sibling of --codex-home", async () => {
+    // Regression coverage: when --codex-home is set outside $HOME and
+    // --agents-home is omitted, cleanup must default agentsHome to
+    // `path.dirname(codexRoot)/.agents` -- mirroring install's
+    // `cleanupLegacyAgentsSkillSymlinks` derivation. Defaulting to `~/.agents`
+    // leaves stale managed symlinks in the custom Codex sibling path that
+    // continue shadowing skills after cleanup.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-codex-agents-default-"))
+    const codexRoot = path.join(tempRoot, ".codex")
+    const siblingAgentsRoot = path.join(tempRoot, ".agents")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    // Seed a CE-owned managed symlink under the SIBLING `.agents/skills/`
+    // (the path install would have written to). If cleanup incorrectly
+    // defaults to `~/.agents`, it will not scan this tree and the symlink
+    // will survive.
+    const ceOwnedTarget = path.join(codexRoot, "skills", "compound-engineering", "ce-plan")
+    await fs.mkdir(ceOwnedTarget, { recursive: true })
+    await fs.writeFile(path.join(ceOwnedTarget, "SKILL.md"), "ce-owned skill")
+    await fs.mkdir(path.join(siblingAgentsRoot, "skills"), { recursive: true })
+    await fs.symlink(ceOwnedTarget, path.join(siblingAgentsRoot, "skills", "ce-plan"))
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "codex",
+      "--codex-home",
+      codexRoot,
+      // Intentionally omit --agents-home so the derived default is exercised.
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    // The "Cleaned codex at <agentsRoot>" line confirms cleanup scanned the
+    // sibling `.agents`, not `~/.agents`.
+    expect(stdout).toContain(`Cleaned codex at ${siblingAgentsRoot}`)
+    // The CE-owned managed symlink was removed.
+    expect(await exists(path.join(siblingAgentsRoot, "skills", "ce-plan"))).toBe(false)
+    // Its target directory is preserved (shared-agents cleanup only removes
+    // the link, not its target).
+    expect(await exists(ceOwnedTarget)).toBe(true)
+  })
+
   test("cleanup migrates manifest-listed Codex artifacts that moved between CE versions", async () => {
     // Scenario: a prior CE install emitted agents as generated skills under
     // `skills/<plugin>/<agent-name>/` and wrote an install manifest listing

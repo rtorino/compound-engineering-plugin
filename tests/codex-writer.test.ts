@@ -25,6 +25,67 @@ async function entryExists(filePath: string): Promise<boolean> {
   }
 }
 
+async function writeSkillMd(dir: string, description: string): Promise<void> {
+  await fs.mkdir(dir, { recursive: true })
+  const name = path.basename(dir)
+  // JSON.stringify escapes embedded quotes so descriptions with apostrophes or
+  // quote characters round-trip cleanly through the frontmatter parser.
+  const frontmatter = `---\nname: ${name}\ndescription: ${JSON.stringify(description)}\n---\n\nSkill body.\n`
+  await fs.writeFile(path.join(dir, "SKILL.md"), frontmatter)
+}
+
+async function readCeShippedSkillDescription(skillName: string): Promise<string> {
+  const skillPath = path.join(
+    import.meta.dir,
+    "..",
+    "plugins",
+    "compound-engineering",
+    "skills",
+    skillName,
+    "SKILL.md",
+  )
+  const raw = await fs.readFile(skillPath, "utf8")
+  return extractDescription(raw)
+}
+
+async function readCeShippedAgentDescription(agentName: string): Promise<string> {
+  const agentsRoot = path.join(import.meta.dir, "..", "plugins", "compound-engineering", "agents")
+  const stack: string[] = [agentsRoot]
+  while (stack.length > 0) {
+    const current = stack.pop()!
+    const entries = await fs.readdir(current, { withFileTypes: true })
+    for (const entry of entries) {
+      const full = path.join(current, entry.name)
+      if (entry.isDirectory()) {
+        stack.push(full)
+        continue
+      }
+      if (entry.isFile() && (entry.name === `${agentName}.md` || entry.name === `${agentName}.agent.md`)) {
+        const raw = await fs.readFile(full, "utf8")
+        return extractDescription(raw)
+      }
+    }
+  }
+  throw new Error(`Could not find shipped agent ${agentName}`)
+}
+
+function extractDescription(raw: string): string {
+  // Minimal frontmatter extractor — enough for the single `description:` line
+  // our shipped SKILL.md / agent files use. Handles plain, double-quoted, and
+  // single-quoted forms but not multi-line descriptions (none shipped today).
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+  if (!match) throw new Error("No frontmatter found")
+  const body = match[1]!
+  const descMatch = body.match(/^description:\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|(.*))$/m)
+  if (!descMatch) throw new Error("No description found in frontmatter")
+  const value = descMatch[1] ?? descMatch[2] ?? descMatch[3] ?? ""
+  return value
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/\\\\/g, "\\")
+    .trim()
+}
+
 describe("writeCodexBundle", () => {
   test("writes prompts, skills, and config", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-test-"))
@@ -311,20 +372,33 @@ describe("writeCodexBundle", () => {
   })
 
   test("moves legacy flat Codex CE artifacts to a namespaced backup", async () => {
+    // Flat skill directories at `~/.codex/skills/<name>/` are ownership-gated
+    // against CE's shipped SKILL.md descriptions. Seed each legacy dir with a
+    // realistic SKILL.md frontmatter whose `description` matches what CE has
+    // shipped, so the ownership gate classifies it as `"ce-owned"` and moves
+    // it to legacy-backup. (Real legacy CE installs carry these frontmatter
+    // descriptions on disk — bare content without frontmatter looks like a
+    // user-authored skill and is preserved, as covered by the sibling test.)
+    const currentCeWorkflowDescription = await readCeShippedSkillDescription("ce-plan")
+    const currentCeAgentDescription = await readCeShippedAgentDescription("ce-repo-research-analyst")
+    const LEGACY_CE_PLAN_BETA_DESCRIPTION =
+      "[BETA] Transform feature descriptions or requirements into structured implementation plans grounded in repo patterns and research. Use when the user says 'plan this', 'create a plan', 'write a tech plan', 'plan the implementation', 'how should we build', 'what's the approach for', 'break this down', or when a brainstorm/requirements document is ready for technical planning. Best when requirements are at least roughly defined; for exploratory or ambiguous requests, prefer ce:brainstorm first."
+    const LEGACY_REPRODUCE_BUG_DESCRIPTION =
+      "Systematically reproduce and investigate a bug from a GitHub issue. Use when the user provides a GitHub issue number or URL for a bug they want reproduced or investigated."
+    const LEGACY_BUG_REPRODUCTION_VALIDATOR_DESCRIPTION =
+      "Systematically reproduces and validates bug reports to confirm whether reported behavior is an actual bug. Use when you receive a bug report or issue that needs verification."
+
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-legacy-skill-"))
     const codexRoot = path.join(tempRoot, ".codex")
-    await fs.mkdir(path.join(codexRoot, "skills", "ce-plan"), { recursive: true })
-    await fs.writeFile(path.join(codexRoot, "skills", "ce-plan", "SKILL.md"), "legacy current workflow skill")
-    await fs.mkdir(path.join(codexRoot, "skills", "ce:plan"), { recursive: true })
-    await fs.writeFile(path.join(codexRoot, "skills", "ce:plan", "SKILL.md"), "legacy raw colon workflow skill")
-    await fs.mkdir(path.join(codexRoot, "skills", "ce:plan-beta"), { recursive: true })
-    await fs.writeFile(path.join(codexRoot, "skills", "ce:plan-beta", "SKILL.md"), "legacy raw colon beta workflow skill")
-    await fs.mkdir(path.join(codexRoot, "skills", "repo-research-analyst"), { recursive: true })
-    await fs.writeFile(path.join(codexRoot, "skills", "repo-research-analyst", "SKILL.md"), "legacy current agent skill")
-    await fs.mkdir(path.join(codexRoot, "skills", "reproduce-bug"), { recursive: true })
-    await fs.writeFile(path.join(codexRoot, "skills", "reproduce-bug", "SKILL.md"), "legacy removed skill")
-    await fs.mkdir(path.join(codexRoot, "skills", "bug-reproduction-validator"), { recursive: true })
-    await fs.writeFile(path.join(codexRoot, "skills", "bug-reproduction-validator", "SKILL.md"), "legacy removed agent skill")
+    await writeSkillMd(path.join(codexRoot, "skills", "ce-plan"), currentCeWorkflowDescription)
+    await writeSkillMd(path.join(codexRoot, "skills", "ce:plan"), currentCeWorkflowDescription)
+    await writeSkillMd(path.join(codexRoot, "skills", "ce:plan-beta"), LEGACY_CE_PLAN_BETA_DESCRIPTION)
+    await writeSkillMd(path.join(codexRoot, "skills", "repo-research-analyst"), currentCeAgentDescription)
+    await writeSkillMd(path.join(codexRoot, "skills", "reproduce-bug"), LEGACY_REPRODUCE_BUG_DESCRIPTION)
+    await writeSkillMd(
+      path.join(codexRoot, "skills", "bug-reproduction-validator"),
+      LEGACY_BUG_REPRODUCTION_VALIDATOR_DESCRIPTION,
+    )
     await fs.mkdir(path.join(codexRoot, "prompts"), { recursive: true })
     await fs.writeFile(path.join(codexRoot, "prompts", "reproduce-bug.md"), "legacy removed prompt")
     await fs.writeFile(path.join(codexRoot, "prompts", "report-bug.md"), "legacy deleted command prompt")
@@ -346,6 +420,47 @@ describe("writeCodexBundle", () => {
     expect(await exists(path.join(codexRoot, "prompts", "reproduce-bug.md"))).toBe(false)
     expect(await exists(path.join(codexRoot, "prompts", "report-bug.md"))).toBe(false)
     expect(await exists(path.join(codexRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
+  test("preserves user-authored flat skill at an allow-listed legacy name (e.g., ce-plan)", async () => {
+    // Regression for P1 Codex review: `cleanupKnownLegacyCodexArtifacts` used
+    // to unconditionally move every allow-listed `~/.codex/skills/<name>/`
+    // directory into `compound-engineering/legacy-backup/`, so a user-authored
+    // flat skill at a name that happens to share a legacy/current CE name
+    // (e.g. `ce-plan`) was silently relocated on `install --to codex`. The
+    // install path now fingerprints the flat `SKILL.md` against CE's shipped
+    // descriptions (current + historical) before touching the directory.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-user-ceplan-preserve-"))
+    const codexRoot = path.join(tempRoot, ".codex")
+    const userSkillDir = path.join(codexRoot, "skills", "ce-plan")
+    await fs.mkdir(userSkillDir, { recursive: true })
+    const userSkillBody =
+      "---\nname: ce-plan\ndescription: \"Project-local ce-plan helper — totally different from the upstream CE workflow.\"\n---\n\n# my custom ce-plan\n"
+    await fs.writeFile(path.join(userSkillDir, "SKILL.md"), userSkillBody)
+
+    const plugin = await loadClaudePlugin(path.join(import.meta.dir, "..", "plugins", "compound-engineering"))
+    const bundle = convertClaudeToCodex(plugin, {
+      agentMode: "subagent",
+      inferTemperature: true,
+      permissions: "none",
+    })
+    await writeCodexBundle(codexRoot, bundle)
+
+    // The user's skill directory and its SKILL.md survive the install byte-for-byte.
+    expect(await exists(path.join(userSkillDir, "SKILL.md"))).toBe(true)
+    expect(await fs.readFile(path.join(userSkillDir, "SKILL.md"), "utf8")).toBe(userSkillBody)
+
+    // And was not silently relocated into legacy-backup.
+    const backupRoot = path.join(codexRoot, "compound-engineering", "legacy-backup")
+    if (await exists(backupRoot)) {
+      const timestamps = await fs.readdir(backupRoot)
+      for (const ts of timestamps) {
+        const skillsBackup = path.join(backupRoot, ts, "skills")
+        if (!(await exists(skillsBackup))) continue
+        const backed = await fs.readdir(skillsBackup)
+        expect(backed).not.toContain("ce-plan")
+      }
+    }
   })
 
   test("preserves unrelated user skills at flat ~/.codex/skills/<name>/ that share a name with a current CE skill", async () => {
