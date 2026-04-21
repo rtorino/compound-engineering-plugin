@@ -44,6 +44,10 @@ Determine how to proceed based on what was provided in `<input_document>`.
 
 ### Phase 1: Quick Start
 
+0. **Check for Session State** _(runs before plan reading)_
+
+   Check for `SESSION_STATE.md` in the project root. If it exists, read `references/session-state.md` for the state format and resume behavior. Offer to resume from the recorded state or start fresh. If the state is stale (>7 days) or references a different branch, flag it.
+
 1. **Read Plan and Clarify** _(skip if arriving from Phase 0 with a bare prompt)_
 
    - Read the work document completely
@@ -189,6 +193,7 @@ Determine how to proceed based on what was provided in `<input_document>`.
      - Run tests after changes
      - Assess testing coverage: did this task change behavior? If yes, were tests written or updated? If no tests were added, is the justification deliberate (e.g., pure config, no behavioral change)?
      - Mark task as completed
+     - Update `SESSION_STATE.md` with current task progress (see `references/session-state.md` for format). Orchestrator-level only — never from inside subagents.
      - Evaluate for incremental commit (see below)
    ```
 
