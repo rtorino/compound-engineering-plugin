@@ -99,8 +99,6 @@ If you previously used the Bun-only Codex install, back up stale CE artifacts be
 bunx @every-env/compound-plugin cleanup --target codex
 ```
 
-The `coding-tutor` plugin installs the same way; its slash commands are an extra that needs the `--include-skills` flag on the Bun step.
-
 <details>
 <summary>Standalone install without <code>codex plugin marketplace add</code></summary>
 
