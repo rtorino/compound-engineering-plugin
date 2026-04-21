@@ -20,6 +20,8 @@ This command takes a work document (plan, specification, or todo file) or a bare
 
 ### Phase 0: Input Triage
 
+**Session state check:** Before anything else, check for `SESSION_STATE.md` in the project root. If it exists, read `references/session-state.md` for the state format and resume behavior. Offer to resume from the recorded state or start fresh. If the state is stale (>7 days) or references a different branch, flag it.
+
 Determine how to proceed based on what was provided in `<input_document>`.
 
 **Plan document** (input is a file path to an existing plan, specification, or todo file) → skip to Phase 1.
@@ -43,10 +45,6 @@ Determine how to proceed based on what was provided in `<input_document>`.
 ---
 
 ### Phase 1: Quick Start
-
-0. **Check for Session State** _(runs before plan reading)_
-
-   Check for `SESSION_STATE.md` in the project root. If it exists, read `references/session-state.md` for the state format and resume behavior. Offer to resume from the recorded state or start fresh. If the state is stale (>7 days) or references a different branch, flag it.
 
 1. **Read Plan and Clarify** _(skip if arriving from Phase 0 with a bare prompt)_
 
