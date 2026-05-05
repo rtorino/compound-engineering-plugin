@@ -24,6 +24,7 @@ This command takes a work document (plan or specification) or a bare prompt desc
 1. Run: check if `SESSION_STATE.md` exists in the project root (use Bash: `test -f SESSION_STATE.md && echo EXISTS || echo NONE`)
 2. If EXISTS: read `SESSION_STATE.md`, then read `references/session-state.md` for resume behavior. Present the state to the user and ask: "Found session state — resume from here, or start fresh?" Do NOT proceed to input triage until the user responds.
 3. If NONE: proceed to input triage below.
+4. **Ruflo memory enrichment (optional):** After the SESSION_STATE.md check, if `mcp__claude-flow__agentdb_health` is available in your tools, read `references/ruflo-memory-integration.md` and follow its session-start steps to query for related past sessions. If ruflo is not available, skip this — SESSION_STATE.md is sufficient.
 
 Determine how to proceed based on what was provided in `<input_document>`.
 
@@ -332,6 +333,8 @@ Determine how to proceed based on what was provided in `<input_document>`.
 ### Phase 3-4: Quality Check and Finishing Work
 
 When all Phase 2 tasks are complete and execution transitions to quality check, you must read `references/shipping-workflow.md` for the full shipping workflow. Do not skip this. Also read `references/verification-discipline.md` for per-message verification freshness, claim-to-evidence mapping, and linguistic red-flag detection before making any completion claims.
+
+**Trajectory capture (after shipping):** If the execution involved a non-obvious approach — an initial attempt that failed, an unexpected dependency order, or a workaround — read `references/trajectory-capture.md` and write a trajectory doc. Skip this for routine work where the plan was followed with no surprises.
 
 ## Key Principles
 
